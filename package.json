@@ -1,0 +1,17 @@
+{
+  "name": "adblockradio-buffer",
+  "version": "1.0.0",
+  "description": "Adblock Radio module to buffer radio stream data and deliver it to end user according to its listening preferences.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Alexandre Storelli <a_npm@storelli.fr>",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "adblockradio-sdk": "git://github.com/dest4/adblockradio-sdk.git#master",
+    "async": "^2.6.0",
+    "loglevel": "^1.6.0",
+    "webradio-metadata": "^0.1.3"
+  }
+}
