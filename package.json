@@ -7,11 +7,14 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Alexandre Storelli <a_npm@storelli.fr>",
-  "license": "GPL-3.0",
+  "license": "UNLICENSED",
   "dependencies": {
     "adblockradio-sdk": "git://github.com/dest4/adblockradio-sdk.git#master",
     "async": "^2.6.0",
-    "loglevel": "^1.6.0",
-    "webradio-metadata": "^0.1.3"
+    "loglevel": "^1.6.1",
+    "webradio-metadata": "^0.1.4"
+  },
+  "devDependencies": {
+    "eslint": "^4.15.0"
   }
 }

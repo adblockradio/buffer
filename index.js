@@ -1,16 +1,16 @@
 // Adblock Radio module to buffer radio stream data and deliver it to end user
 // according to its listening preferences.
 
+"use strict";
+
 var abrsdk = require("adblockradio-sdk");
-var meta = require("webradio-metadata");
 var fs = require("fs");
 var log = require("loglevel");
-var Dl = require("../adblockradio-dl/dl.js");
 log.setLevel("debug");
-var { Writable } = require("stream");
 var cp = require("child_process");
 var findDataFiles = require("../adblockradio/predictor-db/findDataFiles.js");
 var async = require("async");
+var DlFactory = require("./DlFactory.js");
 
 const DL = true;
 const FETCH_METADATA = true;
@@ -28,147 +28,13 @@ try {
 	return log.error("cannot load config. err=" + e);
 }
 
-class Db {
-	constructor(options) {
-		this.country = options.country;
-		this.name = options.name;
-		this.path = options.path;
-		this.ext = options.ext;
-	}
-
-	newAudioSegment(callback) {
-		var now = new Date();
-		var dir = this.path + "/records/" + dirDate(now) + "/" + this.country + "_" + this.name + "/todo/";
-		var path = dir + now.toISOString();
-		log.debug("saveAudioSegment: path=" + path);
-		var self = this;
-		cp.exec("mkdir -p \"" + dir + "\"", function(error, stdout, stderr) {
-			if (error) {
-				log.error("warning, could not create path " + path);
-			}
-			//log.debug("saveAudioSegment: callback");
-
-			callback({
-				audio: new fs.createWriteStream(path + "." + self.ext), //new AudioWriteStream(path + "." + self.ext),
-				metadata: new MetaWriteStream(path + ".json")
-			});
-		});
-	}
-}
-
-/*class AudioWriteStream extends Writable {
-	constructor(path) {
-		super();
-		this.path = path;
-		this.file = new fs.createWriteStream(path + ".part");
-	}
-
-	_write(data, enc, next) {
-		this.file.write(data);
-		next();
-	}
-
-	_final(next) {
-		var self = this;
-		this.file.end(function() {
-			fs.rename(self.path + ".part", self.path, function(err) {
-				if (err) {
-					log.error("AudioWriteStream: err=" + err);
-				}
-				next();
-			});
-		});
-	}
-}*/
-
-class MetaWriteStream extends Writable {
-	constructor(path) {
-		super({ objectMode: true });
-		this.file = new fs.createWriteStream(path);
-		this.ended = false;
-		this.meta = {};
-	}
-
-	_write(meta, enc, next) {
-		if (!meta.type) {
-			log.error("MetaWriteStream: no data type");
-			return next();
-		}
-		//log.debug("MetaWriteStream: data type=" + meta.type);
-		this.meta[meta.type] = meta.data;
-		next();
-	}
-
-	_final(next) {
-		//log.debug("MetaWriteStream: end. meta=" + JSON.stringify(this.meta));
-		this.file.end(JSON.stringify(this.meta));
-		this.ended = true;
-		next();
-	}
-}
-
-var dirDate = function(now) {
-	return (now.getUTCFullYear()) + "-" + (now.getUTCMonth()+1 < 10 ? "0" : "") + (now.getUTCMonth()+1) + "-" + (now.getUTCDate() < 10 ? "0" : "") + (now.getUTCDate());
-}
-
-var DlFactory = function(radio, metadataCallback) {
-	var newDl = new Dl({ country: radio.country, name: radio.name, segDuration: SEG_DURATION });
-	var dbs = null;
-	newDl.on("error", function(err) {
-		console.log("dl err=" + err);
-	});
-	newDl.on("metadata", function(metadata) {
-		log.info(radio.country + "_" + radio.name + " metadata=" + JSON.stringify(metadata));
-		metadataCallback(metadata);
-		db = new Db({ country: radio.country, name: radio.name, ext: metadata.ext, path: __dirname });
-
-		newDl.on("data", function(dataObj) {
-			//dataObj: { newSegment: newSegment, tBuffer: this.tBuffer, data: data
-			if (!dataObj.newSegment) {
-				dbs.audio.write(dataObj.data);
-			} else {
-				newDl.pause();
-				if (dbs) {
-					dbs.audio.end();
-					dbs.metadata.end()
-				}
-				db.newAudioSegment(function(newdbs) {
-					dbs = newdbs;
-					if (FETCH_METADATA) {
-						getMeta(radio.country, radio.name, function(err, parsedMeta, corsEnabled) {
-							if (err) {
-								log.warn("getMeta: error fetching title meta. err=" + err);
-							} else {
-								log.info(radio.country + "_" + radio.name + " meta=" + JSON.stringify(parsedMeta));
-								if (!dbs.metadata.ended) {
-									dbs.metadata.write({ type: "title", data: parsedMeta });
-								} else {
-									log.warn("getMeta: could not write metadata, stream already ended");
-								}
-							}
-						});
-					}
-					dbs.audio.write(dataObj.data);
-					newDl.resume();
-				});
-			}
-		});
-	});
-	return newDl;
-}
-
 if (DL) {
 	var dl = [];
 	for (var i=0; i<config.radios.length; i++) {
-		if (config.radios[i].enable) dl.push(DlFactory(config.radios[i], function(metadata) {
-			for (var j=0; j<config.radios.length; j++) {
-				if (config.radios[j].country == metadata.country && config.radios[j].name == metadata.name) {
-					config.radios[j].url = metadata.url;
-					config.radios[j].favicon = metadata.favicon;
-					return;
-				}
-			}
-		}));
+		config.radios[i].liveStatus = {};
+		if (config.radios[i].enable) {
+			dl.push(DlFactory(config.radios[i], { fetchMetadata: FETCH_METADATA, segDuration: SEG_DURATION }));
+		}
 	}
 }
 
@@ -181,6 +47,7 @@ server.listen(9820, "localhost");
 app.get('/config', function(request, response) {
 	response.set({ 'Access-Control-Allow-Origin': '*' });
 	response.json(config);
+	//log.debug("config[0]=" + JSON.stringify(config.radios[0]));
 });
 
 var getDateFromPath = function(path) {
@@ -188,12 +55,34 @@ var getDateFromPath = function(path) {
 	return spl[spl.length-1];
 }
 
+var getRadio = function(country, name) {
+	if (name) { // both parameters used
+		for (var j=0; j<config.radios.length; j++) {
+			if (config.radios[j].country == country && config.radios[j].name == name) {
+				return config.radios[j];
+			}
+		}
+	} else { // only first parameter used
+		for (var j=0; j<config.radios.length; j++) {
+			if (config.radios[j].country + "_" + config.radios[j].name == country) {
+				return config.radios[j];
+			}
+		}
+	}
+	return null;
+}
+
+var isLive = function(radio, file) {
+	return getRadio(radio).liveStatus.currentPrefix == file;
+}
+
+var listenRequestDate = null;
 var listenHandler = function(response, radio, after, state, callback) {
-	var before = new Date(+new Date(after)+60000).toISOString();
+	var before = new Date(+new Date(after)+6*SEG_DURATION*1000).toISOString();
 	log.debug("listenHandler: after=" + after + " before=" + before + " bufferSeg=" + state.nSegmentsInitialBuffer);
 	findDataFiles({ radios: [ radio ], after: after, before: before, path: __dirname }, function(classes) {
 		var list = {};
-		for (classItem in classes) {
+		for (var classItem in classes) {
 			Object.assign(list, classes[classItem]);
 		}
 		var files = Object.keys(list);
@@ -204,25 +93,35 @@ var listenHandler = function(response, radio, after, state, callback) {
 		var timeoutMonitor = null;
 
 		async.forEachOfSeries(files, function(file, index, filesCallback) {
-			//log.debug("listen: read=" + file + state.ext);
-			fs.readFile(file + state.ext, function(err, data) {
-				if (err) log.error("listen: readFile err=" + err)
+			log.debug("listen: read=" + file + state.ext);
 
-				var bufManager = function() {
-					before = new Date(+new Date(getDateFromPath(file))+1).toISOString();
-					if (state.nSegmentsInitialBuffer > 0) {
-						state.nSegmentsInitialBuffer--;
-						filesCallback();
-					} else {
-						setTimeout(filesCallback, +SEG_DURATION*1000 - (new Date()-state.lastSentDate));
-					}
-				}
+			var rs;
+			var livePlay;
+			if (isLive(radio, file)) {
+				livePlay = true;
+				//log.info("listenHandler: currentAudioFile");
+				rs = getRadio(radio).liveStatus.liveReadStream;
+			} else {
+				livePlay = false;
+				rs = fs.createReadStream(file + state.ext);
+			}
 
+			var dataRead = 0;
+			rs.on("data", function(data) {
+				response.write(data);
+				dataRead += data.length;
+			});
+			rs.on("error", function(err) {
+				log.error("listen: readFile err=" + err + " livePlay=" + livePlay);
+			});
+			rs.on("end", function() {
 				state.lastSentDate = new Date();
-				log.debug("listen: send " + data.length + " bytes from file " + (index+1) + "/" + files.length);
-				if (response.write(data)) {
+				var willWaitDrain = !response.write("");
+				log.debug("listen: sent file " + (index+1) + "/" + files.length + " bytes=" + dataRead + " waitDrain=" + willWaitDrain + " live=" + livePlay);
+				if (livePlay || !willWaitDrain) { //willWaitDrain) { // detect congestion of stream
 					bufManager();
 				} else {
+					log.debug("listenHandler: will wait for drain event");
 					response.once("drain", function() {
 						clearTimeout(timeoutMonitor);
 						bufManager();
@@ -234,6 +133,21 @@ var listenHandler = function(response, radio, after, state, callback) {
 					}, SEG_DURATION*1500);
 				}
 			});
+			var bufManager = function() {
+				before = new Date(+new Date(getDateFromPath(file))+1).toISOString();
+				if (state.requestDate !== listenRequestDate) {
+					filesCallback({ message: "request canceled because another one has been initiated" });
+				} else if (livePlay) {
+					filesCallback();
+				} else if (state.nSegmentsInitialBuffer > 0) {
+					state.nSegmentsInitialBuffer--;
+					filesCallback();
+				} else {
+					var delay = +SEG_DURATION*1000 - (new Date()-state.lastSentDate);
+					log.debug("listenHandler: send more data in " + delay + " ms");
+					setTimeout(filesCallback, delay);
+				}
+			}
 		}, function(err) {
 			if (err) {
 				log.error("listen: err=" + err.message);
@@ -249,7 +163,7 @@ var metadataHandler = function(response, radio, after) {
 	findDataFiles({ radios: [ radio ], after: after, path: __dirname }, function(classes) {
 		//log.debug(classes); // very verbose
 		var list = {};
-		for (classItem in classes) {
+		for (var classItem in classes) {
 			Object.assign(list, classes[classItem]);
 		}
 		var files = Object.keys(list);
@@ -257,21 +171,22 @@ var metadataHandler = function(response, radio, after) {
 		//response.json(list);
 		var isSameSegment = function(curSegment, newData) {
 			if (curSegment.class !== newData.class) {
-				log.debug("isSameSegment: curEnd=" + curSegment.end + " diff class cur=" + curSegment.class + " vs new=" + newData.class);
+				//log.debug("isSameSegment: curEnd=" + curSegment.end + " diff class cur=" + curSegment.class + " vs new=" + newData.class);
 				return false;
 			} else if (!curSegment.title || !newData.title) {
-				log.debug("isSameSegment: curEnd=" + curSegment.end + " no title");
+				//log.debug("isSameSegment: curEnd=" + curSegment.end + " no title");
 				return true;
 			} else if (curSegment.title.artist && newData.title.artist && curSegment.title.artist !== newData.title.artist) {
-				log.debug("isSameSegment: curEnd=" + curSegment.end + " diff artist cur=" + curSegment.title.artist + " vs new=" + newData.title.artist);
+				//log.debug("isSameSegment: curEnd=" + curSegment.end + " diff artist cur=" + curSegment.title.artist + " vs new=" + newData.title.artist);
 				return false;
 			} else if (curSegment.title.title && newData.title.title && curSegment.title.title !== newData.title.title) {
-				log.debug("isSameSegment: curEnd=" + curSegment.end + " diff title cur=" + curSegment.title.title + " vs new=" + newData.title.title);
+				//log.debug("isSameSegment: curEnd=" + curSegment.end + " diff title cur=" + curSegment.title.title + " vs new=" + newData.title.title);
 				return false;
 			} else if (curSegment.title.cover && newData.title.cover && curSegment.title.cover !== newData.title.cover) {
-				log.debug("isSameSegment: curEnd=" + curSegment.end + " diff cover");
+				//log.debug("isSameSegment: curEnd=" + curSegment.end + " diff cover");
 				return false;
 			} else {
+				//log.debug("isSameSegment: same segment");
 				return true;
 			}
 		}
@@ -284,24 +199,38 @@ var metadataHandler = function(response, radio, after) {
 		var curSegment = newSegment(0);
 		async.forEachOfSeries(files, function(file, index, filesCallback) {
 			//log.debug("metadata: read=" + file + ".json");
-			fs.readFile(file + ".json", function(err, data) {
-				if (err) log.error("metadata: readFile err=" + err);
-				try {
-					var pData = JSON.parse(data);
-				} catch(e) {
-					log.error("metadata: json parse error file=" + file + ".json");
-					return filesCallback();
-				}
-				pData.class = list[file].class;
-				if (isSameSegment(curSegment, pData)) {
-					curSegment.title = pData.title;
-					curSegment.end = getDateFromPath(file);
-				} else {
+
+			curSegment.end = getDateFromPath(file);
+
+			if (isLive(radio, file)) {
+				//log.info("listenHandler: currentAudioFile");
+				var pData = { class: list[file].class, title: getRadio(radio).liveStatus.metadata };
+				if (!isSameSegment(curSegment, pData)) {
 					result.push(curSegment);
 					curSegment = newSegment(index);
 				}
+				curSegment.title = pData.title;
 				filesCallback();
-			});
+			} else {
+				fs.readFile(file + ".json", function(err, data) {
+					if (err) log.error("metadata: readFile err=" + err);
+					try {
+						var pData = JSON.parse(data);
+					} catch(e) {
+						log.error("metadata: json parse error file=" + file + ".json");
+						return filesCallback();
+					}
+					pData.class = list[file].class;
+					if (!isSameSegment(curSegment, pData)) {
+						result.push(curSegment);
+						curSegment = newSegment(index);
+					}
+					curSegment.title = pData.title;
+					filesCallback();
+				});
+			}
+
+
 		}, function(err) {
 			if (err) log.error("metadata: err=" + err.message);
 			result.push(curSegment);
@@ -318,14 +247,18 @@ app.get('/:action/:radio/:after', function(request, response) {
 	var after = request.params.after;
 	log.debug("get: action=" + action + " radio=" + radio + " after=" + after);
 
+
 	switch(action) {
 		case "listen":
 			var ext = ".mp3"; // TODO check for other extensions
 			var state = {
 				nSegmentsInitialBuffer: Math.floor(LISTEN_BUFFER/SEG_DURATION),
 				lastSentDate: new Date(),
-				ext: ext
+				ext: ext,
+				requestDate: new Date()
 			}
+			listenRequestDate = state.requestDate;
+
 			switch(state.ext) {
 				case ".aac": response.set('Content-Type', 'audio/aacp'); break;
 				case ".mp3": response.set('Content-Type', 'audio/mpeg'); break;
@@ -338,5 +271,9 @@ app.get('/:action/:radio/:after', function(request, response) {
 		case "metadata":
 			metadataHandler(response, radio, after);
 			break;
+
+		default:
+			response.setHeader(400);
+			response.end();
 	}
 });

@@ -21,20 +21,6 @@
   font-size: large;
 }
 
-.RadioList {
-	display: inline-flex;
-	flex-wrap: wrap;
-	justify-content: center;
-}
-
-.RadioItem {
-	border: 1px solid grey;
-	border-radius: 10px;
-	margin: 15px;
-	padding: 15px;
-	flex-shrink: 0;
-}
-
 .Footer {
 	text-align: center;
 	margin: 30px 15px;
