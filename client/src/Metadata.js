@@ -19,7 +19,8 @@ class Metadata extends Component {
 
 
 	play(when) {
-		this.props.playCallback(this.props.playingRadio, when);
+		console.log("Metadata play: date=" + this.props.date + " when=" + when + " delay=" + (this.props.date - when));
+		this.props.playCallback(this.props.playingRadio, this.props.date - when);
 	}
 
 	stop() {
@@ -33,16 +34,16 @@ class Metadata extends Component {
 			<MetadataContainer className={classNames({ compact: previewMode })}>
 				{this.props.metaList ?
 					this.props.metaList.map(function(item, i) {
-						if (!item.title || (self.props.maxItems && i >= self.props.maxItems)) return null
+						if (!item.payload || (self.props.maxItems && i >= self.props.maxItems)) return null
 						//var playerTime = +self.props.playingDate;
-						var playing = +new Date(item.start) - 1000 <= self.props.playingDate && (!item.end || self.props.playingDate < +new Date(item.end) - 1000);
+						var playing = +item.validFrom - 1000 <= (self.props.date-self.props.playingDelay) && (!item.validTo || (self.props.date-self.props.playingDelay) < +item.validTo - 1000);
 						//console.log("playing=" + playing + " start=" + item.start + " date=" + playerTime + " stop=" + item.end);
 						return (
-							<MetadataItem className={classNames({ playing: playing, compact: previewMode })} key={"item" + i} onClick={function() { self.play(item.start); }}>
+							<MetadataItem className={classNames({ playing: playing, compact: previewMode })} key={"item" + i} onClick={function() { self.play(item.validFrom); }}>
 								<MetadataText>
-									{!previewMode && (moment(item.start).format("HH:mm") + " – ")}{item.title.artist} - {item.title.title}
+									{!previewMode && (moment(item.validFrom).format("HH:mm") + " – ")}{item.payload.artist} - {item.payload.title}
 								</MetadataText>
-								<MetadataCover className={classNames({ playing: playing })} src={item.title.cover || defaultCover} alt="logo" />
+								<MetadataCover className={classNames({ playing: playing })} src={item.payload.cover || defaultCover} alt="logo" />
 							</MetadataItem>
 						)
 					})
@@ -79,7 +80,7 @@ const MetadataItem = styled.div`
 	background: #eee;
 	display: flex;
 	cursor: pointer;
-	
+
 	&.playing {
 		border: 2px solid red;
 	}

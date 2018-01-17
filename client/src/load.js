@@ -1,4 +1,5 @@
 const HOST = "http://localhost:9820";
+//const HOST = "https://bufferapi.s00.adblockradio.com"
 
 exports.load = function(path, callback) {
 	var xhttp = new XMLHttpRequest();
@@ -16,8 +17,8 @@ exports.load = function(path, callback) {
 
 exports.HOST = HOST;
 
-exports.refreshMetadata = function(radio, date, callback) {
-	exports.load("/metadata/" + radio + "/" + date, function(res) {
+exports.refreshMetadata = function(radio, callback) {
+	exports.load("/metadata/" + radio + "/0", function(res) {
 		var metadata = [];
 		try {
 			metadata = JSON.parse(res);

@@ -4,6 +4,7 @@ import React, { Component } from 'react';
 import './App.css';
 import Radio from './Radio.js';
 import Metadata from './Metadata.js';
+import DelayCanvas from './DelayCanvas.js';
 
 import { load, refreshMetadata, HOST } from './load.js';
 import { play, stop } from './audio.js';
@@ -16,8 +17,6 @@ import iconPlay from "./img/start_1279169.svg";
 import iconStop from "./img/stop_1279170.svg";
 //import iconNext from "./img/next_607554.svg";
 
-const LIVE_DELAY = 15000;
-
 class App extends Component {
 	constructor(props) {
 		super(props);
@@ -25,7 +24,8 @@ class App extends Component {
 			configLoaded: false,
 			config: [],
 			playingRadio: null,
-			playingDate: null
+			playingDate: null,
+			clockDiff: 0
 		}
 		this.play = this.play.bind(this);
 		this.seekBackward = this.seekBackward.bind(this);
@@ -40,10 +40,15 @@ class App extends Component {
 			var f = function(iradio, callback) {
 				if (iradio >= self.state.config.radios.length) return callback();
 				var radio = self.state.config.radios[iradio].country + "_" + self.state.config.radios[iradio].name;
-				var startDate = self.state.playingRadio === radio ? new Date(+new Date() - 120*60000) : new Date(+new Date() - 60000);
-				refreshMetadata(radio, startDate.toISOString(), function(metadata) {
-					metadata[metadata.length-1].end = null;
-					stateChange["meta" + radio] = metadata.reverse();
+				refreshMetadata(radio, function(metadata) {
+					for (var type in metadata) {
+						if (type === "now") {
+							stateChange.clockDiff = +new Date() - metadata.now;
+						} else {
+							metadata[type][metadata[type].length-1].validTo = null;
+							stateChange[radio + "|" + type] = metadata[type].reverse();
+						}
+					}
 					f(iradio+1, callback);
 				});
 			}
@@ -52,7 +57,7 @@ class App extends Component {
 			});
 		}
 
-		load("/config", function(res) {
+		load("/config?t=" + Math.round(Math.random()*1000000), function(res) {
 			try {
 				var config = JSON.parse(res);
 				console.log(config);
@@ -77,32 +82,30 @@ class App extends Component {
 		this.setState({ date: new Date() });
 	}
 
-	play(radio, date) {
-		var self = this;
-		if (radio) {
-			console.log("playing delta = " + (+new Date() - new Date(date)));
-			if (!date) {
-				date = new Date(+new Date() - LIVE_DELAY).toISOString();
-				this.setState({ playingLive: true });
-			} else {
-				this.setState({ playingLive: false });
-			}
-
+	play(radio, delay) {
+		if (radio || delay) {
+			//var delay = +new Date() - this.state.clockDiff - (date ? new Date(date) : new Date();
+			//var secondsDelay = Math.round(delay/1000);
+			if (!radio) radio = this.state.playingRadio;
+			if (!delay) delay = 0;
+			console.log("Play: radio=" + radio + " delay=" + delay);
 			this.setState({
 				playingRadio: radio,
-				playingDate: date,
-				playingDelta: +new Date() - new Date(date)
+				//playingDate: date,
+				playingDelay: delay,
+				playingLive: delay === 0
 			});
-			play(HOST + "/listen/" + radio + "/" + date);
+
+			play(HOST + "/listen/" + radio + "/" + Math.round(delay/1000));
 			document.title = radio.split("_")[1] + " - Adblock Radio";
 		} else {
 			this.setState({
 				playingRadio: null,
-				playingDate: null,
-				playingDelta: 0,
+				//playingDate: null,
+				playingDelay: null,
 				playingLive: null
 			});
-			clearInterval(self.metadataTimerID);
+			//clearInterval(self.metadataTimerID);
 			stop();
 			document.title = "Adblock Radio";
 		}
@@ -110,17 +113,18 @@ class App extends Component {
 
 	seekBackward() {
 		if (!this.state.playingRadio) return;
-		this.play(this.state.playingRadio, new Date(+new Date(this.state.playingDate) - 30000).toISOString());
+		this.play(this.state.playingRadio, Math.min(this.state.playingDelay + 30000, this.state.config.user.cacheLen*1000));
 	}
 
 	seekForward() {
 		if (!this.state.playingRadio) return;
-		var targetDate = +new Date(this.state.playingDate) + 30000;
-		if (targetDate > +new Date() - LIVE_DELAY) { // switch to live
+		//var targetDate = +new Date(this.state.playingDate) + 30000;
+		/*if (targetDate > +new Date() - LIVE_DELAY) { // switch to live
 			this.play(this.state.playingRadio);
 		} else {
 			this.play(this.state.playingRadio, new Date(targetDate).toISOString());
-		}
+		}*/
+		this.play(this.state.playingRadio, Math.max(this.state.playingDelay - 30000,0));
 	}
 
 	render() {
@@ -144,14 +148,17 @@ class App extends Component {
 
 		var statusText;
 		if (self.state.playingRadio) {
+			var delayText = " (direct)";
+			if (!self.state.playingLive) {
+				var delaySeconds = Math.round(self.state.playingDelay/1000); // + self.state.config.user.streamInitialBuffer);
+				var delayMinutes = Math.floor(delaySeconds / 60);
+				delaySeconds = delaySeconds % 60;
+				delayText = " (en différé de " + (delayMinutes ? delayMinutes + "m" : "") + (delaySeconds < 10 ? "0" : "") + delaySeconds + "s)";
+			}
 			statusText = (
 				<span>
 					{self.state.playingRadio.split("_")[1]}
-					{self.state.playingLive ?
-						" (direct)"
-					:
-					" (" + moment(+self.state.date - self.state.playingDelta + LIVE_DELAY).fromNow() + ")"
-					}
+					{delayText}
 				</span>
 			)
 		} else {
@@ -177,6 +184,7 @@ class App extends Component {
 			</StatusButtonsContainer>
 		);
 
+		//console.log("Metadata props: date=" + (+self.state.date) + " clockDiff=" + self.state.clockDiff + " playingDelay=" + self.state.playingDelay);
 
 		return (
 			<AppParent>
@@ -189,22 +197,26 @@ class App extends Component {
 									playCallback={self.play}
 									playing={playing}
 									showMetadata={!self.state.playingRadio}
-									liveMetadata={self.state["meta" + radio.country + "_" + radio.name]}
+									liveMetadata={self.state[radio.country + "_" + radio.name + "|metadata"]}
 									key={"radio" + i} />
 							)
 						})}
 					</RadioList>
 					{self.state.playingRadio &&
 						<Metadata playingRadio={self.state.playingRadio}
-							metaList={self.state["meta" + self.state.playingRadio]}
-							playingDate={+self.state.date - self.state.playingDelta}
-							currentDate={self.state.date}
+							playingDelay={self.state.playingDelay}
+							metaList={self.state[self.state.playingRadio + "|metadata"]}
+							date={+self.state.date - self.state.clockDiff}
 							playCallback={self.play} />
 					}
 				</AppView>
 				<Controls>
 					{status}
 					{buttons}
+					<DelayCanvas playing={!!self.state.playingRadio}
+						playingDelay={self.state.playingDelay}
+						cacheLen={self.state.config.user.cacheLen}
+						playCallback={self.play} />
 					{/*<PlayerStatus settings={this.props.settings} bsw={this.props.bsw} condensed={this.props.condensed} playbackAction={this.togglePlayer} />*/}
 				</Controls>
 			</AppParent>
@@ -249,7 +261,7 @@ const Controls = styled.div`
 `;
 
 const StatusTextContainer = styled.span`
-	padding: 0 20px;
+	padding: 10px 20px 0 20px;
 `;
 
 const StatusClock = styled.span`
@@ -257,7 +269,7 @@ const StatusClock = styled.span`
 `;
 
 const StatusButtonsContainer = styled.span`
-
+	padding: 10px 0 0 0;
 `;
 
 const PlaybackButton = styled.img`
