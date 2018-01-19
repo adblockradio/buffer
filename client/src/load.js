@@ -1,5 +1,5 @@
-const HOST = "http://localhost:9820";
-//const HOST = "https://bufferapi.s00.adblockradio.com"
+//const HOST = "http://localhost:9820";
+const HOST = "https://bufferapi.s00.adblockradio.com"
 
 exports.load = function(path, callback) {
 	var xhttp = new XMLHttpRequest();

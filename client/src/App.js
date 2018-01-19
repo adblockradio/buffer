@@ -5,6 +5,7 @@ import './App.css';
 import Radio from './Radio.js';
 import Metadata from './Metadata.js';
 import DelayCanvas from './DelayCanvas.js';
+import Playlist from './Playlist.js';
 
 import { load, refreshMetadata, HOST } from './load.js';
 import { play, stop } from './audio.js';
@@ -15,6 +16,7 @@ import classNames from 'classnames';
 
 import iconPlay from "./img/start_1279169.svg";
 import iconStop from "./img/stop_1279170.svg";
+import iconList from "./img/list_241386.svg";
 //import iconNext from "./img/next_607554.svg";
 
 class App extends Component {
@@ -25,57 +27,67 @@ class App extends Component {
 			config: [],
 			playingRadio: null,
 			playingDate: null,
-			clockDiff: 0
+			clockDiff: 0,
+			playlistEditMode: false
 		}
 		this.play = this.play.bind(this);
 		this.seekBackward = this.seekBackward.bind(this);
 		this.seekForward = this.seekForward.bind(this);
+		this.switchPlaylistEditMode = this.switchPlaylistEditMode.bind(this);
+		this.refreshMetadataContainer = this.refreshMetadataContainer.bind(this);
+		this.refreshConfig = this.refreshConfig.bind(this);
+		this.insertRadio = this.insertRadio.bind(this);
+		this.removeRadio = this.removeRadio.bind(this);
 	}
 
 	componentDidMount() {
-		let self = this;
+		this.refreshConfig();
+		this.timerID = setInterval(() => this.tick(), 300);
+	}
 
-		var refreshMetadataContainer = function() {
-			var stateChange = {};
-			var f = function(iradio, callback) {
-				if (iradio >= self.state.config.radios.length) return callback();
-				var radio = self.state.config.radios[iradio].country + "_" + self.state.config.radios[iradio].name;
-				refreshMetadata(radio, function(metadata) {
-					for (var type in metadata) {
-						if (type === "now") {
-							stateChange.clockDiff = +new Date() - metadata.now;
-						} else {
-							metadata[type][metadata[type].length-1].validTo = null;
-							stateChange[radio + "|" + type] = metadata[type].reverse();
-						}
+	componentWillUnmount() {
+		clearInterval(this.timerID);
+		clearInterval(this.metadataTimerID);
+	}
+
+	refreshMetadataContainer() {
+		var self = this;
+		var stateChange = {};
+		var f = function(iradio, callback) {
+			if (iradio >= self.state.config.radios.length) return callback();
+			var radio = self.state.config.radios[iradio].country + "_" + self.state.config.radios[iradio].name;
+			refreshMetadata(radio, function(metadata) {
+				for (var type in metadata) {
+					if (type === "now") {
+						stateChange.clockDiff = +new Date() - metadata.now;
+					} else {
+						metadata[type][metadata[type].length-1].validTo = null;
+						stateChange[radio + "|" + type] = metadata[type].reverse();
 					}
-					f(iradio+1, callback);
-				});
-			}
-			f(0, function() {
-				self.setState(stateChange);
+				}
+				f(iradio+1, callback);
 			});
 		}
+		f(0, function() {
+			self.setState(stateChange);
+		});
+	}
 
+	refreshConfig() {
+		var self = this;
 		load("/config?t=" + Math.round(Math.random()*1000000), function(res) {
 			try {
 				var config = JSON.parse(res);
 				console.log(config);
 				self.setState({ config: config }, function() {
-					self.metadataTimerID = setInterval(refreshMetadataContainer, 2000);
-					refreshMetadataContainer();
+					self.metadataTimerID = setInterval(self.refreshMetadataContainer, 2000);
+					self.refreshMetadataContainer();
 				});
 			} catch(e) {
 				console.log("problem parsing JSON from server: " + e.message);
 			}
 			self.setState({ configLoaded: true });
 		});
-		this.timerID = setInterval(function() { self.tick() }, 300);
-	}
-
-	componentWillUnmount() {
-		clearInterval(this.timerID);
-		clearInterval(this.metadataTimerID);
 	}
 
 	tick() {
@@ -87,7 +99,16 @@ class App extends Component {
 			//var delay = +new Date() - this.state.clockDiff - (date ? new Date(date) : new Date();
 			//var secondsDelay = Math.round(delay/1000);
 			if (!radio) radio = this.state.playingRadio;
-			if (!delay) delay = 0;
+			if (!delay) {
+				var startAvailable = new Date();
+				for (var i=0; i<this.state[radio + "|metadata"].length; i++) {
+					if (this.state[radio + "|metadata"][i].validFrom < startAvailable) {
+						startAvailable = this.state[radio + "|metadata"][i].validFrom;
+					}
+				}
+				delay = Math.min(Math.round(+this.state.date - startAvailable), this.state.config.user.cacheLen*1000*2/3) - 8000;
+			}
+
 			console.log("Play: radio=" + radio + " delay=" + delay);
 			this.setState({
 				playingRadio: radio,
@@ -96,7 +117,7 @@ class App extends Component {
 				playingLive: delay === 0
 			});
 
-			play(HOST + "/listen/" + radio + "/" + Math.round(delay/1000));
+			play(HOST + "/listen/" + radio + "/" + Math.round(delay/1000) + "?t=" + Math.round(Math.random()*1000000));
 			document.title = radio.split("_")[1] + " - Adblock Radio";
 		} else {
 			this.setState({
@@ -125,6 +146,24 @@ class App extends Component {
 			this.play(this.state.playingRadio, new Date(targetDate).toISOString());
 		}*/
 		this.play(this.state.playingRadio, Math.max(this.state.playingDelay - 30000,0));
+	}
+
+	switchPlaylistEditMode() {
+		this.setState({ playlistEditMode: !this.state.playlistEditMode });
+	}
+
+	insertRadio(country, name) {
+		var self = this;
+		load("/config/radios/insert/" + country + "/" + name + "?t=" + Math.round(Math.random()*1000000), function(res) {
+			self.refreshConfig()
+		});
+	}
+
+	removeRadio(country, name) {
+		var self = this;
+		load("/config/radios/remove/" + country + "/" + name + "?t=" + Math.round(Math.random()*1000000), function(res) {
+			self.refreshConfig()
+		});
 	}
 
 	render() {
@@ -178,6 +217,7 @@ class App extends Component {
 
 		var buttons = (
 			<StatusButtonsContainer>
+				<PlaybackButton className={classNames({ inactive: !self.state.playlistEditMode })} src={iconList} alt="Edit playlist" onClick={self.switchPlaylistEditMode} />
 				<PlaybackButton className={classNames({ flip: true, inactive: !self.state.playingRadio })} src={iconPlay} alt="Backward 30s" onClick={self.seekBackward} />
 				<PlaybackButton className={classNames({ inactive: !self.state.playingRadio })} src={iconStop} alt="Stop" onClick={() => self.play(null, null)} />
 				<PlaybackButton className={classNames({ inactive: !self.state.playingRadio || self.state.playingLive })} src={iconPlay} alt="Forward 30s" onClick={self.seekForward} />
@@ -189,32 +229,39 @@ class App extends Component {
 		return (
 			<AppParent>
 				<AppView>
-					<RadioList className={classNames({ withPreview: !self.state.playingRadio })}>
+					<RadioList className={classNames({ withPreview: !self.state.playingRadio && !self.state.playlistEditMode })}>
 						{config.radios.map(function(radio, i) {
 							var playing = self.state.playingRadio === radio.country + "_" + radio.name;
 							return (
 								<Radio metadata={radio}
 									playCallback={self.play}
 									playing={playing}
-									showMetadata={!self.state.playingRadio}
+									showMetadata={!self.state.playingRadio && !self.state.playlistEditMode}
 									liveMetadata={self.state[radio.country + "_" + radio.name + "|metadata"]}
 									key={"radio" + i} />
 							)
 						})}
 					</RadioList>
-					{self.state.playingRadio &&
+					{self.state.playingRadio && !self.state.playlistEditMode &&
 						<Metadata playingRadio={self.state.playingRadio}
 							playingDelay={self.state.playingDelay}
 							metaList={self.state[self.state.playingRadio + "|metadata"]}
-							date={+self.state.date - self.state.clockDiff}
+							date={new Date(+self.state.date - self.state.clockDiff)}
 							playCallback={self.play} />
+					}
+					{self.state.playlistEditMode &&
+						<Playlist config={self.state.config}
+							insertRadio={self.insertRadio}
+							removeRadio={self.removeRadio} />
 					}
 				</AppView>
 				<Controls>
 					{status}
 					{buttons}
-					<DelayCanvas playing={!!self.state.playingRadio}
-						playingDelay={self.state.playingDelay}
+					<DelayCanvas playingDelay={self.state.playingDelay}
+						metaList={self.state[self.state.playingRadio + "|metadata"]}
+						date={new Date(+self.state.date - self.state.clockDiff)}
+						inactive={!self.state.playingRadio || !self.state[self.state.playingRadio + "|metadata"]}
 						cacheLen={self.state.config.user.cacheLen}
 						playCallback={self.play} />
 					{/*<PlayerStatus settings={this.props.settings} bsw={this.props.bsw} condensed={this.props.condensed} playbackAction={this.togglePlayer} />*/}

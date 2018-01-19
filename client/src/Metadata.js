@@ -36,7 +36,10 @@ class Metadata extends Component {
 					this.props.metaList.map(function(item, i) {
 						if (!item.payload || (self.props.maxItems && i >= self.props.maxItems)) return null
 						//var playerTime = +self.props.playingDate;
-						var playing = +item.validFrom - 1000 <= (self.props.date-self.props.playingDelay) && (!item.validTo || (self.props.date-self.props.playingDelay) < +item.validTo - 1000);
+						var playing = false;
+						if (self.props.date) {
+							playing = +item.validFrom - 1000 <= (self.props.date-self.props.playingDelay) && (!item.validTo || (self.props.date-self.props.playingDelay) < +item.validTo - 1000);
+						}
 						//console.log("playing=" + playing + " start=" + item.start + " date=" + playerTime + " stop=" + item.end);
 						return (
 							<MetadataItem className={classNames({ playing: playing, compact: previewMode })} key={"item" + i} onClick={function() { self.play(item.validFrom); }}>
@@ -60,6 +63,7 @@ Metadata.propTypes = {
 	playingRadio: PropTypes.string.isRequired,
 	playCallback: PropTypes.func.isRequired,
 	metaList: PropTypes.array,
+	date: PropTypes.object,
 	maxItems: PropTypes.number
 };
 

@@ -3,7 +3,7 @@
 import React, { Component } from "react";
 import PropTypes from "prop-types";
 //import styled from "styled-components";
-import classNames from 'classnames';
+//import classNames from 'classnames';
 
 
 class DelayCanvas extends Component {
@@ -36,6 +36,7 @@ class DelayCanvas extends Component {
 	}
 
 	getCursorPosition(event) {
+		if (this.props.inactive) return;
 		var rect = this.refs.canvas.getBoundingClientRect();
 		var x = event.clientX - rect.left;
 
@@ -49,14 +50,38 @@ class DelayCanvas extends Component {
 		this.play(newDelay);
 	}
 
+	getAvailableCache() {
+		var startAvailable = new Date();
+		for (var i=0; i<this.props.metaList.length; i++) {
+			if (this.props.metaList[i].validFrom < startAvailable) {
+				startAvailable = this.props.metaList[i].validFrom;
+			}
+		}
+		return (+this.props.date - startAvailable) / 1000;
+	}
+
 	updateCanvas() {
 		const ctx = this.refs.canvas.getContext("2d");
 		let height = ctx.canvas.height; //parseFloat(this.props.style.height);
 		let width = ctx.canvas.width; //parseFloat(this.props.style.width);
-		ctx.clearRect(0, 0, width, height);
-		ctx.fillStyle = "rgba(0,0,128,1)";
 		//console.log("canvas height=" + height + " px width=" + width + "px playingDelay=" + this.props.playingDelay + " cacheLen=" + this.props.cacheLen);
+
+		ctx.clearRect(0, 0, width, height);
+
+		if (this.props.inactive) {
+			ctx.fillStyle = "rgba(128,128,128,1)"; // grey
+			return ctx.fillRect(0, 0, width, height);
+		}
+
+		ctx.fillStyle = "rgba(0,0,128,1)"; // blue
 		ctx.fillRect(0, 0, Math.round(width*(1-this.props.playingDelay/1000/this.props.cacheLen)), height);
+
+		// fill unavailable audio in grey
+		var startCache = this.getAvailableCache();
+		if (startCache < this.props.cacheLen) {
+			ctx.fillStyle = "rgba(128,128,128,1)"; // grey
+			ctx.fillRect(0, 0, Math.round(width*(1-startCache/this.props.cacheLen)), height);
+		}
 	}
 
 	render() {
@@ -67,8 +92,9 @@ class DelayCanvas extends Component {
 }
 
 DelayCanvas.propTypes = {
-	playing: PropTypes.bool.isRequired,
 	playingDelay: PropTypes.number,
+	metaList: PropTypes.array,
+	date: PropTypes.object.isRequired,
 	cacheLen: PropTypes.number.isRequired,
 	playCallback: PropTypes.func.isRequired
 };

@@ -6,8 +6,8 @@ log.setLevel("debug");
 var cp = require("child_process");
 var fs = require("fs");
 var { getMeta } = require("webradio-metadata");
-var Dl = require("../adblockradio-dl/dl.js");
-var config = require("./config.js");
+var { StreamDl } = require("../adblockradio-dl/dl.js");
+//var config = require("./config.js");
 
 class Db {
 	constructor(options) {
@@ -15,8 +15,8 @@ class Db {
 		this.name = options.name;
 		this.path = options.path;
 		this.ext = options.ext;
-		this.audioCache = new AudioCache({ bitrate: options.bitrate, cacheLen: config.user.cacheLen });
-		this.metaCache = new MetaCache({ cacheLen: config.user.cacheLen });
+		this.audioCache = new AudioCache({ bitrate: options.bitrate, cacheLen: options.cacheLen });
+		this.metaCache = new MetaCache({ cacheLen: options.cacheLen });
 	}
 
 	dirDate(now) {
@@ -208,9 +208,9 @@ class MetaCache extends Writable {
 				} else {
 					var samePayload = true;
 					for (var key in meta.payload) {
-						if (meta.payload[key] !== this.meta[meta.type][this.meta[meta.type].length-1].payload[key]) {
+						if ("" + meta.payload[key] && "" + meta.payload[key] !== "" + this.meta[meta.type][this.meta[meta.type].length-1].payload[key]) {
 							samePayload = false;
-							//log.debug("MetaCache: _write: different payload key=" + key + " new=" + meta.payload[key] + " vs old=" + this.meta[meta.type][this.meta[meta.type].length-1].payload[key]);
+							log.debug("MetaCache: _write: different payload key=" + key + " new=" + meta.payload[key] + " vs old=" + this.meta[meta.type][this.meta[meta.type].length-1].payload[key]);
 							break;
 						}
 					}
@@ -249,7 +249,7 @@ class MetaCache extends Writable {
 }
 
 module.exports = function(radio, options) {
-	var newDl = new Dl({ country: radio.country, name: radio.name, segDuration: options.segDuration });
+	var newDl = new StreamDl({ country: radio.country, name: radio.name, segDuration: options.segDuration });
 	var dbs = null;
 	newDl.on("error", function(err) {
 		log.error("dl err=" + err);
@@ -258,7 +258,7 @@ module.exports = function(radio, options) {
 		//metadataCallback(metadata);
 		radio.url = metadata.url;
 		radio.favicon = metadata.favicon;
-		var db = new Db({ country: radio.country, name: radio.name, ext: metadata.ext, bitrate: metadata.bitrate, path: __dirname });
+		var db = new Db({ country: radio.country, name: radio.name, ext: metadata.ext, bitrate: metadata.bitrate, cacheLen: options.cacheLen, path: __dirname });
 		log.debug("DlFactory: " + radio.country + "_" + radio.name + " metadata=" + JSON.stringify(metadata));
 
 		newDl.on("data", function(dataObj) {
