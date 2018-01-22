@@ -7,7 +7,7 @@ import Metadata from './Metadata.js';
 import DelayCanvas from './DelayCanvas.js';
 import Playlist from './Playlist.js';
 
-import { load, refreshMetadata, HOST } from './load.js';
+import { load, refreshMetadata, refreshAvailableCache, HOST } from './load.js';
 import { play, stop } from './audio.js';
 import styled from "styled-components";
 import * as moment from 'moment';
@@ -69,7 +69,11 @@ class App extends Component {
 			});
 		}
 		f(0, function() {
-			self.setState(stateChange);
+			refreshAvailableCache(self.state.config.radios, function(stateCache) {
+				Object.assign(stateChange, stateCache);
+				//console.log("stateChange = " + JSON.stringify(stateChange));
+				self.setState(stateChange);
+			});
 		});
 	}
 
@@ -98,15 +102,13 @@ class App extends Component {
 		if (radio || delay) {
 			//var delay = +new Date() - this.state.clockDiff - (date ? new Date(date) : new Date();
 			//var secondsDelay = Math.round(delay/1000);
-			if (!radio) radio = this.state.playingRadio;
-			if (!delay) {
-				var startAvailable = new Date();
-				for (var i=0; i<this.state[radio + "|metadata"].length; i++) {
-					if (this.state[radio + "|metadata"][i].validFrom < startAvailable) {
-						startAvailable = this.state[radio + "|metadata"][i].validFrom;
-					}
-				}
-				delay = Math.min(Math.round(+this.state.date - startAvailable), this.state.config.user.cacheLen*1000*2/3) - 8000;
+			radio = radio || this.state.playingRadio;
+			if (delay === null || delay === undefined || isNaN(delay)) { // delay == 0 is a valid delay.
+				delay = Math.min(+this.state[radio + "|available"]*1000, this.state.config.user.cacheLen*1000*2/3);
+			} else if (delay < 0) {
+				delay = 0;
+			} else if (delay > this.state.config.user.cacheLen*1000) {
+				delay = this.state.config.user.cacheLen*1000;
 			}
 
 			console.log("Play: radio=" + radio + " delay=" + delay);
@@ -192,7 +194,9 @@ class App extends Component {
 				var delaySeconds = Math.round(self.state.playingDelay/1000); // + self.state.config.user.streamInitialBuffer);
 				var delayMinutes = Math.floor(delaySeconds / 60);
 				delaySeconds = delaySeconds % 60;
-				delayText = " (en différé de " + (delayMinutes ? delayMinutes + "m" : "") + (delaySeconds < 10 ? "0" : "") + delaySeconds + "s)";
+				var textDelay = (delayMinutes ? delayMinutes + " min" : "");
+				textDelay += (delaySeconds ? ((delaySeconds < 10 && delayMinutes ? " 0" : " ") + delaySeconds + "s") : "");
+				delayText = " (en différé de " + textDelay + ")";
 			}
 			statusText = (
 				<span>
@@ -218,7 +222,7 @@ class App extends Component {
 		var buttons = (
 			<StatusButtonsContainer>
 				<PlaybackButton className={classNames({ inactive: !self.state.playlistEditMode })} src={iconList} alt="Edit playlist" onClick={self.switchPlaylistEditMode} />
-				<PlaybackButton className={classNames({ flip: true, inactive: !self.state.playingRadio })} src={iconPlay} alt="Backward 30s" onClick={self.seekBackward} />
+				<PlaybackButton className={classNames({ flip: true, inactive: !self.state.playingRadio || self.state.playingDelay >= self.state.config.user.cacheLen*1000 })} src={iconPlay} alt="Backward 30s" onClick={self.seekBackward} />
 				<PlaybackButton className={classNames({ inactive: !self.state.playingRadio })} src={iconStop} alt="Stop" onClick={() => self.play(null, null)} />
 				<PlaybackButton className={classNames({ inactive: !self.state.playingRadio || self.state.playingLive })} src={iconPlay} alt="Forward 30s" onClick={self.seekForward} />
 			</StatusButtonsContainer>
@@ -258,8 +262,10 @@ class App extends Component {
 				<Controls>
 					{status}
 					{buttons}
+					{/*metaList={self.state[self.state.playingRadio + "|metadata"]}*/}
 					<DelayCanvas playingDelay={self.state.playingDelay}
-						metaList={self.state[self.state.playingRadio + "|metadata"]}
+						availableCache={self.state[self.state.playingRadio + "|available"]}
+						classList={self.state[self.state.playingRadio + "|class"]}
 						date={new Date(+self.state.date - self.state.clockDiff)}
 						inactive={!self.state.playingRadio || !self.state[self.state.playingRadio + "|metadata"]}
 						cacheLen={self.state.config.user.cacheLen}
@@ -294,10 +300,10 @@ const RadioList = styled.div`
 `;
 
 const Controls = styled.div`
-	margin: -60px 0 0 0px;
+	margin: -100px 0 0 0px;
 	z-index: 1000;
 	background: #eee;
-	height: 60px;
+	height: 100px;
 	align-items: center;
 	display: flex;
 	border-top: 2px solid #888;
@@ -308,7 +314,7 @@ const Controls = styled.div`
 `;
 
 const StatusTextContainer = styled.span`
-	padding: 10px 20px 0 20px;
+	padding: 40px 20px 0 20px;
 `;
 
 const StatusClock = styled.span`
@@ -323,6 +329,7 @@ const PlaybackButton = styled.img`
 	height: 40px;
 	margin-right: 10px;
 	cursor: pointer;
+	margin-top: 35px;
 
 	&.flip {
 		transform: rotate(180deg);

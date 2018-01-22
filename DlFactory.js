@@ -27,7 +27,7 @@ class Db {
 		var now = new Date();
 		var dir = this.path + "/records/" + this.dirDate(now) + "/" + this.country + "_" + this.name + "/todo/";
 		var path = dir + now.toISOString();
-		log.debug("newAudioSegment: path=" + path);
+		//log.debug("newAudioSegment: path=" + path);
 		var self = this;
 		try {
 			cp.execSync("mkdir -p \"" + dir + "\"");
@@ -92,8 +92,8 @@ class AudioCache extends Writable {
 		this.buffer = this.buffer ? Buffer.concat([ this.buffer, data ]) : data;
 		//log.debug("AudioCache: _write: add " + data.length + " to buffer, new len=" + this.buffer.length);
 		if (this.buffer.length >= this.cacheLen * this.bitrate + this.flushAmount) {
-			log.debug("AudioCache: _write: cutting buffer at len = " + this.cacheLen * this.bitrate);
-			this.buffer = this.buffer.slice(this.cacheLen * this.bitrate);
+			//log.debug("AudioCache: _write: cutting buffer at len = " + this.cacheLen * this.bitrate);
+			this.buffer = this.buffer.slice(this.flushAmount);
 			if (this.readCursor) {
 				this.readCursor -= this.flushAmount;
 				if (this.readCursor <= 0) this.readCursor = null;
@@ -137,6 +137,10 @@ class AudioCache extends Writable {
 		this.readCursor = Math.min(this.buffer.length, nextCursor);
 		return data;
 	}
+
+	getAvailableCache() {
+		return this.buffer ? this.buffer.length / this.bitrate : 0;
+	}
 }
 
 class MetaWriteStream extends Writable {
@@ -176,13 +180,17 @@ class MetaCache extends Writable {
 		if (!meta.type) {
 			log.error("MetaCache: no data type");
 			return next();
+		} else if (meta.validFrom > meta.validTo) {
+			log.error("MetaCache: negative time window validFrom=" + meta.validFrom + " validTo=" + meta.validTo);
+			return next();
 		} else {
 			//log.debug("MetaCache: _write: " + JSON.stringify(meta));
 		}
 		// events of this kind:
-		// meta = { type: "metadata", validFrom: Date, validTo: Date, payload: { artist: "...", title : "...", cover: "..." } }
-		// meta = { type: "class", validFrom: Date, validTo: Date, payload: "todo" }
-		// meta = { type: "signal", validFrom: Date, validTo: Date, payload: [0.4, 0.3, ...] }
+		// meta = { type: "metadata", validFrom: Date, validTo: Date, payload: { artist: "...", title : "...", cover: "..." } } ==> metadata for enhanced experience
+		// meta = { type: "class", validFrom: Date, validTo: Date, payload: "todo" } ==> class of audio, for automatic channel hopping
+		// meta = { type: "volume", validFrom: Date, validTo: Date, payload: [0.85, 0.89, 0.90, ...] } ==> normalized volume for audio player
+		// meta = { type: "signal", validFrom: Date, validTo: Date, payload: [0.4, 0.3, ...] } ==> signal amplitude envelope for visualization
 
 		// are stored in the following structure:
 		// this.meta = {
@@ -203,6 +211,7 @@ class MetaCache extends Writable {
 		switch (meta.type) {
 			case "metadata":
 			case "class":
+			case "volume":
 				if (!this.meta[meta.type]) {
 					this.meta[meta.type] = [ { validFrom: meta.validFrom, validTo: meta.validTo, payload: meta.payload } ];
 				} else {
@@ -238,6 +247,16 @@ class MetaCache extends Writable {
 			this.meta[meta.type].splice(0, 1);
 		}
 
+		// fix overlapping entries
+		for (var i=0; i<this.meta[meta.type].length-1; i++) {
+			if (this.meta[meta.type][i].validTo > this.meta[meta.type][i+1].validFrom) {
+				//var middle = (this.meta[meta.type][i].validTo + this.meta[meta.type][i+1].validFrom) / 2;
+				var delta = (this.meta[meta.type][i].validTo - this.meta[meta.type][i+1].validFrom) / 2;
+				log.debug("MetaCache: fix meta " + meta.type + " overlapping prevTo=" + this.meta[meta.type][i].validTo + " nextFrom=" + this.meta[meta.type][i+1].validFrom + " newBound=" + (this.meta[meta.type][i].validTo - delta));
+				this.meta[meta.type][i].validTo -= delta;
+				this.meta[meta.type][i+1].validFrom += delta;
+			}
+		}
 		//log.debug("MetaCache: _write: meta[" + meta.type + "]=" + JSON.stringify(this.meta[meta.type]));
 		next();
 	}
@@ -258,44 +277,81 @@ module.exports = function(radio, options) {
 		//metadataCallback(metadata);
 		radio.url = metadata.url;
 		radio.favicon = metadata.favicon;
-		var db = new Db({ country: radio.country, name: radio.name, ext: metadata.ext, bitrate: metadata.bitrate, cacheLen: options.cacheLen, path: __dirname });
+		var db = new Db({
+			country: radio.country,
+			name: radio.name,
+			ext: metadata.ext,
+			bitrate: metadata.bitrate,
+			cacheLen: options.cacheLen,
+			path: __dirname
+		});
 		log.debug("DlFactory: " + radio.country + "_" + radio.name + " metadata=" + JSON.stringify(metadata));
+
+		var onClassPrediction = function(className, volume) {
+			var now = +new Date();
+			db.metaCache.write({
+				type: "class",
+				validFrom: now-500*options.segDuration,
+				validTo: now+500*options.segDuration,
+				payload: className
+			});
+			db.metaCache.write({
+				type: "volume",
+				validFrom: now-500*options.segDuration,
+				validTo: now+500*options.segDuration,
+				payload: volume
+			});
+			if (options.saveAudio && dbs && dbs.metadata) {
+				dbs.metadata.write({ type: "class", data: className });
+				dbs.metadata.write({ type: "volume", data: volume });
+			}
+		}
+
+		Object.assign(radio.liveStatus, {
+			audioCache: db.audioCache,
+			metaCache: db.metaCache,
+			onClassPrediction: onClassPrediction
+		});
 
 		newDl.on("data", function(dataObj) {
 			//dataObj: { newSegment: newSegment, tBuffer: this.tBuffer, data: data
 			if (!dataObj.newSegment) {
-				dbs.audio.write(dataObj.data);
+				if (options.saveAudio) dbs.audio.write(dataObj.data);
 			} else {
 				newDl.pause();
-				if (dbs) {
-					dbs.audio.end();
-					dbs.metadata.end()
+				if (options.saveAudio) {
+					if (dbs) {
+						dbs.audio.end();
+						dbs.metadata.end()
+					}
+					dbs = db.newAudioSegment();
+					Object.assign(radio.liveStatus, {
+						currentPrefix: dbs.path,
+						liveReadStream: dbs.audio
+					});
 				}
-				//log.debug("DlFactory: " + radio.country + "_" + radio.name + " new segment");
-				dbs = db.newAudioSegment();
-				Object.assign(radio.liveStatus, {
-					currentPrefix: dbs.path,
-					liveReadStream: dbs.audio,
-					audioCache: db.audioCache,
-					metaCache: db.metaCache
-				});
+
 				if (options.fetchMetadata) {
 					getMeta(radio.country, radio.name, function(err, parsedMeta, corsEnabled) {
 						if (err) return log.warn("getMeta: error fetching title meta. err=" + err);
 						//log.debug(radio.country + "_" + radio.name + " meta=" + JSON.stringify(parsedMeta));
-						if (!dbs.metadata.ended) {
-							Object.assign(radio.liveStatus, {
-								metadata: parsedMeta
-							});
-							dbs.metadata.write({ type: "metadata", data: parsedMeta });
-							db.metaCache.write({ type: "metadata", validFrom: +dbs.date-500*options.segDuration, validTo: +dbs.date+500*options.segDuration, payload: parsedMeta });
-							db.metaCache.write({ type: "class", validFrom: +dbs.date-500*options.segDuration, validTo: +dbs.date+500*options.segDuration, payload: "todo" });
-						} else {
-							log.warn("getMeta: could not write metadata, stream already ended");
+						if (options.saveAudio) {
+							if (!dbs.metadata.ended) {
+								dbs.metadata.write({ type: "metadata", data: parsedMeta });
+							} else {
+								log.warn("getMeta: could not write metadata, stream already ended");
+							}
 						}
+
+						Object.assign(radio.liveStatus, {
+							metadata: parsedMeta
+						});
+						var now = +new Date();
+						db.metaCache.write({ type: "metadata", validFrom: now-500*options.segDuration, validTo: now+500*options.segDuration, payload: parsedMeta });
 					});
 				}
-				dbs.audio.write(dataObj.data);
+
+				if (options.saveAudio) dbs.audio.write(dataObj.data);
 				newDl.resume();
 			}
 			db.audioCache.write(dataObj.data);

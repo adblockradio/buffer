@@ -3,22 +3,26 @@
 
 "use strict";
 
-var abrsdk = require("adblockradio-sdk");
 var log = require("loglevel");
 log.setLevel("debug");
 var cp = require("child_process");
 var findDataFiles = require("./findDataFiles.js");
 var async = require("async");
 var DlFactory = require("./DlFactory.js");
+var abrsdk = require("adblockradio-sdk")();
 
 const FETCH_METADATA = true;
+const SAVE_AUDIO = false;
 const SEG_DURATION = 10; // in seconds
 const LISTEN_BUFFER = 30; // in seconds
+var USE_ABRSDK = true;
 
 var { config, getRadios, insertRadio, removeRadio, getAvailableInactive } = require("./config.js");
 
 var dl = [];
 var updateDlList = function() {
+	var playlistChange = false;
+
 	// add missing sockets
 	for (var i=0; i<config.radios.length; i++) {
 		var alreadyThere = false;
@@ -31,7 +35,13 @@ var updateDlList = function() {
 		if (!alreadyThere && config.radios[i].enable) {
 			config.radios[i].liveStatus = {};
 			log.info("updateDlList: start " + config.radios[i].country + "_" + config.radios[i].name);
-			dl.push(DlFactory(config.radios[i], { fetchMetadata: FETCH_METADATA, segDuration: SEG_DURATION, cacheLen: config.user.cacheLen }));
+			dl.push(DlFactory(config.radios[i], {
+				fetchMetadata: FETCH_METADATA,
+				segDuration: SEG_DURATION,
+				saveAudio: SAVE_AUDIO,
+				cacheLen: config.user.cacheLen + config.user.streamInitialBuffer
+			}));
+			playlistChange = true;
 		}
 	}
 
@@ -48,11 +58,55 @@ var updateDlList = function() {
 			log.info("updateDlList: stop " + dl[j].country + "_" + dl[j].name);
 			dl[j].stopDl();
 			dl.splice(j, 1);
+			playlistChange = true;
 		}
+	}
+
+	if (USE_ABRSDK && playlistChange) {
+		var playlistArray = [];
+		for (var i=0; i<config.radios.length; i++) {
+			playlistArray.push(config.radios[i].country + "_" + config.radios[i].name);
+		}
+		abrsdk.sendPlaylist(playlistArray, config.user.token, function(err, validatedPlaylist) {
+			if (err) {
+				log.warn("abrsdk: sendPlaylist error = " + err);
+			} else {
+				if (playlistArray.length != validatedPlaylist.length) {
+					log.warn("abrsdk: playlist not accepted. requested=" + JSON.stringify(playlistArray) + " validated=" + JSON.stringify(validatedPlaylist));
+				}
+			}
+		});
 	}
 }
 
-updateDlList();
+if (USE_ABRSDK) {
+	abrsdk.connectServer(function(err) {
+		if (err) {
+			log.error("abrsdk: connection error: " + err + ". switch off sdk");
+			USE_ABRSDK = false;
+		} else {
+			abrsdk.setPredictionCallback(function(predictions) {
+				var status, volume;
+				for (var i=0; i<predictions.radios.length; i++) {
+					switch (predictions.status[i]) {
+						case abrsdk.statusList.STATUS_AD: status = "AD"; break;
+						case abrsdk.statusList.STATUS_SPEECH: status = "SPEECH"; break;
+						case abrsdk.statusList.STATUS_MUSIC: status = "MUSIC"; break;
+						default: status = "not available";
+					}
+					// normalized volume to apply to the audio tag to have similar loudness between channels
+					volume = Math.pow(10, (Math.min(abrsdk.GAIN_REF-predictions.gain[i],0))/20);
+					// you can now plug the data to your radio player.
+					//log.debug("abrsdk: " + predictions.radios[i] + " has status " + status + " and volume " + Math.round(volume*100)/100);
+					getRadio(predictions.radios[i]).liveStatus.onClassPrediction(status, volume);
+				}
+			});
+		}
+		updateDlList();
+	});
+} else {
+	updateDlList();
+}
 
 var http = require('http');
 var express = require('express');
@@ -132,6 +186,12 @@ app.get('/:action/:radio/:delay', function(request, response) {
 
 	switch(action) {
 		case "listen":
+
+			if (delay == "available") {
+				response.set({ 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-cache, must-revalidate' });
+				response.json({ radio: radio, available: Math.floor(getRadio(radio).liveStatus.audioCache.getAvailableCache()-config.user.streamInitialBuffer)});
+				return;
+			}
 			var ext = ".mp3"; // TODO check for other extensions
 
 			switch(ext) {
@@ -198,7 +258,7 @@ app.get('/:action/:radio/:delay', function(request, response) {
 			break;
 
 		case "metadata":
-			response.set({ 'Access-Control-Allow-Origin': '*' });
+			response.set({ 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-cache, must-revalidate' });
 			var radio = getRadio(radio);
 			if (!radio) {
 				log.error("/metadata/" + radio + "/" + delay + ": radio not available");
