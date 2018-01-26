@@ -7,11 +7,15 @@ import PropTypes from "prop-types";
 
 const colors = {
 	GREY: "rgba(128,128,128,1)",
-	BLUE: "rgba(0,0,128,1)",
-	RED: "rgba(128,0,0,1)",
-	GREEN: "rgba(0,128,0,1)",
-	YELLOW: "rgba(128,128,0,1)"
+	BLUE: "rgb(0, 181, 222)",
+	RED: "rgb(255, 104, 104)",
+	GREEN: "rgb(138, 209, 21)",
+	YELLOW: "rgba(128,128,0,1)",
+	PINK: "rgb(239, 102, 176)", /*#ef66b0*/
+	LIGHT_PINK: "rgba(239, 102, 176, 0.5)"
 }
+
+const TICKS_INTERVAL = 60000;
 
 class DelayCanvas extends Component {
 
@@ -47,12 +51,8 @@ class DelayCanvas extends Component {
 		var rect = this.refs.canvas.getBoundingClientRect();
 		var x = event.clientX - rect.left;
 
-		var canvasDom = document.getElementById('canvas');
-		var cs = getComputedStyle(canvasDom);
-		var width = parseInt(cs.getPropertyValue('width'), 10);
-
 		//var width = this.refs.canvas.getContext("2d").canvas.width;
-		var newDelay = Math.round(this.props.cacheLen*(1-x/width)*1000);
+		var newDelay = Math.round(this.props.cacheLen*(1-x/this.props.width)*1000);
 		//console.log("Canvas click: x=" + x + " width=" + width + " cacheLen=" + this.props.cacheLen + " newDelay=" + newDelay);
 		this.play(newDelay);
 	}
@@ -74,7 +74,7 @@ class DelayCanvas extends Component {
 	updateCanvas() {
 		const ctx = this.refs.canvas.getContext("2d");
 		let height = ctx.canvas.height; //parseFloat(this.props.style.height);
-		let width = ctx.canvas.width; //parseFloat(this.props.style.width);
+		let width = this.props.width; //parseFloat(this.props.style.width);
 
 		/*var canvasDom = document.getElementById('canvas');
 		var cs = getComputedStyle(canvasDom);
@@ -88,18 +88,31 @@ class DelayCanvas extends Component {
 		}
 
 
-		ctx.fillStyle = colors.BLUE;
-		ctx.fillRect(0, this.props.classList ? height / 2 : 0, this.delayToX(width, this.props.playingDelay), height);
+		var cursorX = this.delayToX(width, this.props.playingDelay);
+		ctx.fillStyle = colors.LIGHT_PINK;
+		ctx.fillRect(0, 0, cursorX, this.props.classList ? 0.4*height : height);
+
+		ctx.cursor = function(x, y, height, width) {
+			this.fillStyle = colors.PINK;
+			this.beginPath();
+			this.moveTo(x, y);
+			this.lineTo(Math.round(x+width/2), Math.round(y-height));
+			this.lineTo(Math.round(x-width/2), Math.round(y-height));
+			this.fill()
+		}
+
+		ctx.cursor(cursorX, 0.6*height, 0.6*height, 0.3*height);
 
 		// fill unavailable audio in grey
 		//var startCache = this.getAvailableCache();
 		if (this.props.availableCache < this.props.cacheLen) {
 			ctx.fillStyle = colors.GREY;
-			ctx.fillRect(0, this.props.classList ? height / 2 : 0, this.delayToX(width, this.props.availableCache*1000), height);
+			ctx.fillRect(0, 0, this.delayToX(width, this.props.availableCache*1000), this.props.classList ? 0.4*height : height);
 		}
 
 		if (this.props.classList) {
-			for (var i=0; i<this.props.classList.length; i++) {
+			//var logTxt = "";
+			for (var i=this.props.classList.length-1; i>=0; i--) {
 				var cl = this.props.classList[i];
 				switch (cl.payload) {
 					case "AD": ctx.fillStyle = colors.RED; break;
@@ -107,11 +120,13 @@ class DelayCanvas extends Component {
 					case "MUSIC": ctx.fillStyle = colors.BLUE; break;
 					default: ctx.fillStyle = colors.GREY;
 				}
-				ctx.fillRect(this.delayToX(width, +this.props.date-cl.validFrom), 0, this.delayToX(width, cl.validTo ? (+this.props.date-cl.validTo) : 0), height/2);
-				if (i == 0) {
-					console.log("canvas height=" + height + " px width=" + width + "px playingDelay=" + this.props.playingDelay + " cacheLen=" + this.props.cacheLen + " from0=" + (+this.props.date-cl.validFrom) + " to0=" + (cl.validTo ? (+this.props.date-cl.validTo) : 0));
-				}
+				var xStart = Math.max(this.delayToX(width, +this.props.date-cl.validFrom), 0);
+				var xStop = this.delayToX(width, cl.validTo ? (+this.props.date-cl.validTo) : 0);
+				ctx.fillRect(xStart, 0.6*height, xStop, height);
+				//console.log("canvas height=" + height + " px width=" + width + "px playingDelay=" + this.props.playingDelay + " cacheLen=" + this.props.cacheLen + " from0=" + xStart + " to0=" + xStop);
+				//logTxt += "i=" + i + " " + xStart + "->" + xStop + " | ";
 			}
+			//console.log(logTxt);
 		}
 
 		ctx.line = function(x1, y1, x2, y2) {
@@ -121,18 +136,17 @@ class DelayCanvas extends Component {
 
 		ctx.beginPath();
 		ctx.strokeStyle = colors.YELLOW;
-		for (var i=0; i<=Math.floor(this.props.cacheLen/60); i++) {
-			var offset = this.props.date % 60000;
-			var x = this.delayToX(width, offset + i*60000);
+		for (let i=0; i<=Math.floor(this.props.cacheLen/TICKS_INTERVAL*1000); i++) {
+			var offset = this.props.date % TICKS_INTERVAL;
+			var x = this.delayToX(width, offset + i*TICKS_INTERVAL);
 			ctx.line(x,0,x,height);
 		}
 		ctx.stroke();
-
 	}
 
 	render() {
 		return (
-			<canvas width="800px" height="60px" ref="canvas" id="canvas" style={canvasStyle} />
+			<canvas width={this.props.width} height="60px" ref="canvas" id="canvas" style={canvasStyle} />
 		)
 	}
 }

@@ -254,7 +254,7 @@ class App extends Component {
 							removeRadio={self.removeRadio} />
 					}
 				</AppView>
-				<Controls>
+				<Controls id="controls">
 					{status}
 					{buttons}
 					{/*metaList={self.state[self.state.playingRadio + "|metadata"]}*/}
@@ -264,11 +264,21 @@ class App extends Component {
 						date={new Date(+self.state.date - self.state.clockDiff)}
 						inactive={!self.state.playingRadio || !self.state[self.state.playingRadio + "|metadata"]}
 						cacheLen={self.state.config.user.cacheLen}
+						width={self.state.canvasWidth || 100}
 						playCallback={self.play} />
 					{/*<PlayerStatus settings={this.props.settings} bsw={this.props.bsw} condensed={this.props.condensed} playbackAction={this.togglePlayer} />*/}
 				</Controls>
 			</AppParent>
 		);
+	}
+
+	componentDidUpdate() {
+		var canvasContainerDom = document.getElementById('controls');
+		if (!canvasContainerDom) return;
+		var cs = getComputedStyle(canvasContainerDom);
+		var canvasWidth = parseInt(cs.getPropertyValue('width'), 10);
+		if (canvasWidth === this.state.canvasWidth) return;
+		this.setState({ canvasWidth: canvasWidth });
 	}
 }
 
@@ -278,7 +288,7 @@ const AppParent = styled.div`
 
 const AppView = styled.div`
 	display: flex;
-	height: calc(100% - 60px);
+	height: calc(100% - 100px);
 `;
 
 const RadioList = styled.div`

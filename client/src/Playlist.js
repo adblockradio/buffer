@@ -56,6 +56,12 @@ class Playlist extends Component {
 
 		return (
 			<PlaylistContainer>
+				<p>
+					Adblock Radio Buffer. Tous droits réservés, Alexandre Storelli, 2018.<br />
+					Ce site n'a pas vocation à être diffusé au public.<br />
+					Il est mis à disposition pour un usage strictement limité à fins de démonstration.<br />
+					L'écoute est limitée à un seul utilisateur simultané.
+				</p>
 				{!playlistEmpty &&
 					<PlaylistSectionTitle>Your current favorites : click to remove</PlaylistSectionTitle>
 				}
