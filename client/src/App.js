@@ -77,12 +77,12 @@ class App extends Component {
 		});
 	}
 
-	refreshConfig() {
+	refreshConfig(callback) {
 		var self = this;
 		load("/config?t=" + Math.round(Math.random()*1000000), function(res) {
 			try {
 				var config = JSON.parse(res);
-				console.log(config);
+				//console.log(config);
 				self.setState({ config: config }, function() {
 					self.metadataTimerID = setInterval(self.refreshMetadataContainer, 2000);
 					self.refreshMetadataContainer();
@@ -91,6 +91,7 @@ class App extends Component {
 				console.log("problem parsing JSON from server: " + e.message);
 			}
 			self.setState({ configLoaded: true });
+			if (callback) callback();
 		});
 	}
 
@@ -154,17 +155,17 @@ class App extends Component {
 		this.setState({ playlistEditMode: !this.state.playlistEditMode });
 	}
 
-	insertRadio(country, name) {
+	insertRadio(country, name, callback) {
 		var self = this;
 		load("/config/radios/insert/" + country + "/" + name + "?t=" + Math.round(Math.random()*1000000), function(res) {
-			self.refreshConfig()
+			self.refreshConfig(callback);
 		});
 	}
 
-	removeRadio(country, name) {
+	removeRadio(country, name, callback) {
 		var self = this;
 		load("/config/radios/remove/" + country + "/" + name + "?t=" + Math.round(Math.random()*1000000), function(res) {
-			self.refreshConfig()
+			self.refreshConfig(callback);
 		});
 	}
 
@@ -177,12 +178,6 @@ class App extends Component {
 					<div className="RadioItem">
 						<p>Loading…</p>
 					</div>
-				</div>
-			);
-		} else if (config.radios.length === 0) {
-			return (
-				<div className="RadioItem">
-					<p>No radios, please add some in config/radios.json and restart server</p>
 				</div>
 			);
 		}
@@ -246,14 +241,14 @@ class App extends Component {
 							)
 						})}
 					</RadioList>
-					{self.state.playingRadio && !self.state.playlistEditMode &&
+					{self.state.playingRadio && !self.state.playlistEditMode && config.radios.length > 0 &&
 						<Metadata playingRadio={self.state.playingRadio}
 							playingDelay={self.state.playingDelay}
 							metaList={self.state[self.state.playingRadio + "|metadata"]}
 							date={new Date(+self.state.date - self.state.clockDiff)}
 							playCallback={self.play} />
 					}
-					{self.state.playlistEditMode &&
+					{(self.state.playlistEditMode || config.radios.length === 0) &&
 						<Playlist config={self.state.config}
 							insertRadio={self.insertRadio}
 							removeRadio={self.removeRadio} />

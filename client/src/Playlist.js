@@ -12,6 +12,7 @@ class Playlist extends Component {
 		super(props);
 		this.insert = this.insert.bind(this);
 		this.remove = this.remove.bind(this);
+		this.componentDidMount = this.componentDidMount.bind(this);
 		this.state = {
 			radiosLoaded: false,
 			radios: []
@@ -33,11 +34,11 @@ class Playlist extends Component {
 	}
 
 	insert(country, name) {
-		this.props.insertRadio(country, name);
+		this.props.insertRadio(country, name, this.componentDidMount);
 	}
 
 	remove(country, name) {
-		this.props.removeRadio(country, name);
+		this.props.removeRadio(country, name, this.componentDidMount);
 	}
 
 	render() {
@@ -51,10 +52,13 @@ class Playlist extends Component {
 		var current = this.props.config.radios;
 		var available = this.state.radios;
 		var playlistFull = this.props.config.radios.length >= this.props.config.user.maxRadios;
+		var playlistEmpty = this.props.config.radios.length === 0;
 
 		return (
 			<PlaylistContainer>
-				<PlaylistSectionTitle>Your current favorites : click to remove</PlaylistSectionTitle>
+				{!playlistEmpty &&
+					<PlaylistSectionTitle>Your current favorites : click to remove</PlaylistSectionTitle>
+				}
 				{current.map(function(radio, i) {
 					return (
 						<PlaylistItem className={classNames({ active: true })} key={"item" + i} onClick={function() { self.remove(radio.country, radio.name); }}>
@@ -66,9 +70,9 @@ class Playlist extends Component {
 					)
 				})}
 				{!playlistFull ?
-					<PlaylistSectionTitle>More radios : click to add</PlaylistSectionTitle>
+					<PlaylistSectionTitle>Add radios to your favorites</PlaylistSectionTitle>
 				:
-				<PlaylistSectionTitle>More radios : make room in your favorites, then click to add</PlaylistSectionTitle>
+				<PlaylistSectionTitle>Your favorites playlist is full. Make room, then click to add</PlaylistSectionTitle>
 				}
 				{available.map(function(radio, i) {
 					return (

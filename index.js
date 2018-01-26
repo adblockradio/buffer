@@ -98,7 +98,12 @@ if (USE_ABRSDK) {
 					volume = Math.pow(10, (Math.min(abrsdk.GAIN_REF-predictions.gain[i],0))/20);
 					// you can now plug the data to your radio player.
 					//log.debug("abrsdk: " + predictions.radios[i] + " has status " + status + " and volume " + Math.round(volume*100)/100);
-					getRadio(predictions.radios[i]).liveStatus.onClassPrediction(status, volume);
+					var radio = getRadio(predictions.radios[i]);
+					if (!radio || !radio.liveStatus) {
+						log.error("abrsdk: cannot call prediction callback");
+					} else {
+						radio.liveStatus.onClassPrediction(status, volume);
+					}
 				}
 			});
 		}
@@ -264,15 +269,16 @@ app.get('/:action/:radio/:delay', function(request, response) {
 				log.error("/metadata/" + radio + "/" + delay + ": radio not available");
 				response.writeHead(400);
 				return response.end();
-			}
-			var metaCache = radio.liveStatus.metaCache;
-			if (!metaCache) {
+			} else if (!radio.liveStatus) {
+				log.error("/metadata/" + radio + "/" + delay + ": radio.liveStatus not available");
+				response.writeHead(400);
+				return response.end();
+			} else if (!radio.liveStatus.metaCache) {
 				log.error("/metadata/" + radio + "/" + delay + ": metadata not available");
 				response.writeHead(400);
 				return response.end();
-			} else {
-				response.json(metaCache.read());
 			}
+			response.json(radio.liveStatus.metaCache.read());
 			break;
 
 		default:
