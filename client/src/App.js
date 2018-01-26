@@ -99,13 +99,17 @@ class App extends Component {
 		this.setState({ date: new Date() });
 	}
 
+	defaultDelay(radio) {
+		return Math.min(+this.state[radio + "|available"]*1000, this.state.config.user.cacheLen*1000*2/3);
+	}
+
 	play(radio, delay) {
 		if (radio || delay) {
 			//var delay = +new Date() - this.state.clockDiff - (date ? new Date(date) : new Date();
 			//var secondsDelay = Math.round(delay/1000);
 			radio = radio || this.state.playingRadio;
 			if (delay === null || delay === undefined || isNaN(delay)) { // delay == 0 is a valid delay.
-				delay = Math.min(+this.state[radio + "|available"]*1000, this.state.config.user.cacheLen*1000*2/3);
+				delay = this.defaultDelay(radio);
 			} else if (delay < 0) {
 				delay = 0;
 			} else if (delay > this.state.config.user.cacheLen*1000) {
@@ -231,12 +235,26 @@ class App extends Component {
 					<RadioList className={classNames({ withPreview: !self.state.playingRadio && !self.state.playlistEditMode })}>
 						{config.radios.map(function(radio, i) {
 							var playing = self.state.playingRadio === radio.country + "_" + radio.name;
+							var showMetadata = !self.state.playingRadio && !self.state.playlistEditMode;
+							var liveMetadata;
+							if (showMetadata) {
+								var metaList = self.state[radio.country + "_" + radio.name + "|metadata"];
+								if (metaList) {
+									for (let j=0; j<metaList.length; j++) {
+										if (metaList[j].validFrom - 1000 <= (self.state.date-self.defaultDelay(radio.country + "_" + radio.name)) &&
+											(!metaList[j].validTo || (self.state.date-self.defaultDelay(radio.country + "_" + radio.name) < +metaList[j].validTo - 1000))) {
+											liveMetadata = [metaList[j]];
+											break;
+										}
+									}
+								}
+							}
 							return (
 								<Radio metadata={radio}
 									playCallback={self.play}
 									playing={playing}
-									showMetadata={!self.state.playingRadio && !self.state.playlistEditMode}
-									liveMetadata={self.state[radio.country + "_" + radio.name + "|metadata"]}
+									showMetadata={showMetadata}
+									liveMetadata={liveMetadata}
 									key={"radio" + i} />
 							)
 						})}
