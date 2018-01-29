@@ -161,14 +161,14 @@ class App extends Component {
 
 	insertRadio(country, name, callback) {
 		var self = this;
-		load("/config/radios/insert/" + country + "/" + name + "?t=" + Math.round(Math.random()*1000000), function(res) {
+		load("/config/radios/insert/" + encodeURIComponent(country) + "/" + encodeURIComponent(name) + "?t=" + Math.round(Math.random()*1000000), function(res) {
 			self.refreshConfig(callback);
 		});
 	}
 
 	removeRadio(country, name, callback) {
 		var self = this;
-		load("/config/radios/remove/" + country + "/" + name + "?t=" + Math.round(Math.random()*1000000), function(res) {
+		load("/config/radios/remove/" + encodeURIComponent(country) + "/" + encodeURIComponent(name) + "?t=" + Math.round(Math.random()*1000000), function(res) {
 			self.refreshConfig(callback);
 		});
 	}

@@ -7,7 +7,8 @@ var getParameterByName = function(name, url) {
 	return decodeURIComponent(results[2].replace(/\+/g, " "));
 }
 
-var HOST = getParameterByName("dev") ? "http://localhost:9820" : "https://bufferapi.s00.adblockradio.com";
+//var HOST = getParameterByName("dev") ? "http://localhost:9820" : "https://bufferapi.s00.adblockradio.com";
+var HOST = getParameterByName("dev") ? "http://localhost:9820" : "/bufferapi";
 
 exports.load = function(path, callback) {
 	var xhttp = new XMLHttpRequest();
@@ -26,7 +27,7 @@ exports.load = function(path, callback) {
 exports.HOST = HOST;
 
 exports.refreshMetadata = function(radio, callback) {
-	exports.load("/metadata/" + radio + "/0", function(res) {
+	exports.load("/metadata/" + encodeURIComponent(radio) + "/0", function(res) {
 		var metadata = [];
 		try {
 			metadata = JSON.parse(res);
@@ -44,7 +45,7 @@ exports.refreshAvailableCache = function(radios, callback) {
 	var stateChange = {};
 	var f = function(i, finished) {
 		if (i >= radios.length) return finished();
-		exports.load("/listen/" + radios[i].country + "_" + radios[i].name + "/available", function(avRes) {
+		exports.load("/listen/" + encodeURIComponent(radios[i].country + "_" + radios[i].name) + "/available", function(avRes) {
 			var avResParsed = {};
 			try {
 				avResParsed = JSON.parse(avRes);

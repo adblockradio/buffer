@@ -81,19 +81,24 @@ class AudioWriteStream extends Duplex {
 class AudioCache extends Writable {
 	constructor(options) {
 		super();
-		this.buffer = null;
 		this.cacheLen = options.cacheLen;
 		this.bitrate = options.bitrate;
 		this.flushAmount = this.cacheLen * this.bitrate * 0.1;
 		this.readCursor = null;
+		this.buffer = Buffer.allocUnsafe(this.cacheLen * this.bitrate + 2*this.flushAmount).fill(0);
+		this.writeCursor = 0;
 	}
 
 	_write(data, enc, next) {
-		this.buffer = this.buffer ? Buffer.concat([ this.buffer, data ]) : data;
+		data.copy(this.buffer, this.writeCursor);
+		this.writeCursor += data.length;
+
 		//log.debug("AudioCache: _write: add " + data.length + " to buffer, new len=" + this.buffer.length);
-		if (this.buffer.length >= this.cacheLen * this.bitrate + this.flushAmount) {
+		if (this.writeCursor >= this.cacheLen * this.bitrate + this.flushAmount) {
 			//log.debug("AudioCache: _write: cutting buffer at len = " + this.cacheLen * this.bitrate);
-			this.buffer = this.buffer.slice(this.flushAmount);
+			this.buffer.copy(this.buffer, 0, this.flushAmount);
+			this.writeCursor -= this.flushAmount;
+
 			if (this.readCursor) {
 				this.readCursor -= this.flushAmount;
 				if (this.readCursor <= 0) this.readCursor = null;
@@ -103,7 +108,7 @@ class AudioCache extends Writable {
 	}
 
 	readLast(secondsFromEnd, duration) {
-		var l = this.buffer.length;
+		var l = this.writeCursor; //this.buffer.length;
 		if (secondsFromEnd < 0 || duration < 0) {
 			log.error("AudioCache: readLast: negative secondsFromEnd or duration");
 			return null;
@@ -130,16 +135,16 @@ class AudioCache extends Writable {
 		if (duration < 0) {
 			log.error("AudioCache: readAmountAfterCursor: negative duration");
 			return null;
-		} else if (nextCursor >= this.buffer.length) {
-			log.warn("AudioCache: readAmountAfterCursor: will read until " + this.buffer.length + " instead of " + nextCursor);
+		} else if (nextCursor >= this.writeCursor) {
+			log.warn("AudioCache: readAmountAfterCursor: will read until " + this.writeCursor + " instead of " + nextCursor);
 		}
 		var data = this.buffer.slice(this.readCursor, nextCursor);
-		this.readCursor = Math.min(this.buffer.length, nextCursor);
+		this.readCursor = Math.min(this.writeCursor, nextCursor);
 		return data;
 	}
 
 	getAvailableCache() {
-		return this.buffer ? this.buffer.length / this.bitrate : 0;
+		return this.buffer ? this.writeCursor / this.bitrate : 0;
 	}
 }
 

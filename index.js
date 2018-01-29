@@ -99,7 +99,7 @@ if (USE_ABRSDK) {
 					// you can now plug the data to your radio player.
 					//log.debug("abrsdk: " + predictions.radios[i] + " has status " + status + " and volume " + Math.round(volume*100)/100);
 					var radio = getRadio(predictions.radios[i]);
-					if (!radio || !radio.liveStatus) {
+					if (!radio || !radio.liveStatus || !radio.liveStatus.onClassPrediction) {
 						log.error("abrsdk: cannot call prediction callback");
 					} else {
 						radio.liveStatus.onClassPrediction(status, volume);
@@ -126,9 +126,11 @@ app.get('/config', function(request, response) {
 
 app.get('/config/radios/insert/:country/:name', function(request, response) {
 	response.set({ 'Access-Control-Allow-Origin': '*' });
-	insertRadio(request.params.country, request.params.name, function(err) {
+	var country = decodeURIComponent(request.params.country);
+	var name = decodeURIComponent(request.params.name);
+	insertRadio(country, name, function(err) {
 		if (err) {
-			log.error("/config/insert/" + request.params.country + "/" + request.params.name + ": err=" + err);
+			log.error("/config/insert/" + country + "/" + name + ": err=" + err);
 			response.writeHead(400);
 			response.end();
 		} else {
@@ -141,9 +143,11 @@ app.get('/config/radios/insert/:country/:name', function(request, response) {
 
 app.get('/config/radios/remove/:country/:name', function(request, response) {
 	response.set({ 'Access-Control-Allow-Origin': '*' });
-	removeRadio(request.params.country, request.params.name, function(err) {
+	var country = decodeURIComponent(request.params.country);
+	var name = decodeURIComponent(request.params.name);
+	removeRadio(country, name, function(err) {
 		if (err) {
-			log.error("/config/remove/" + request.params.country + "/" + request.params.name + ": err=" + err);
+			log.error("/config/remove/" + country + "/" + name + ": err=" + err);
 			response.writeHead(400);
 			response.end();
 		} else {
@@ -180,7 +184,7 @@ var listenRequestDate = null;
 
 app.get('/:action/:radio/:delay', function(request, response) {
 	var action = request.params.action;
-	var radio = request.params.radio;
+	var radio = decodeURIComponent(request.params.radio);
 	var delay = request.params.delay;
 	//log.debug("get: action=" + action + " radio=" + radio + " delay=" + delay);
 
