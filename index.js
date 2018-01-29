@@ -197,15 +197,10 @@ app.get('/:action/:radio/:delay', function(request, response) {
 				response.json({ radio: radio, available: Math.floor(getRadio(radio).liveStatus.audioCache.getAvailableCache()-config.user.streamInitialBuffer)});
 				return;
 			}
-			var ext = ".mp3"; // TODO check for other extensions
-
-			switch(ext) {
-				case ".aac": response.set('Content-Type', 'audio/aacp'); break;
-				case ".mp3": response.set('Content-Type', 'audio/mpeg'); break;
-			}
 
 			var state = { newRequest: true, requestDate: new Date() };
-			var initialBuffer = getRadio(radio).liveStatus.audioCache.readLast(+delay+config.user.streamInitialBuffer,config.user.streamInitialBuffer);
+			var radioObj = getRadio(radio);
+			var initialBuffer = radioObj.liveStatus.audioCache.readLast(+delay+config.user.streamInitialBuffer,config.user.streamInitialBuffer);
 
 			if (!initialBuffer) {
 				log.error("/listen/" + radio + "/" + delay + ": initialBuffer not available");
@@ -214,6 +209,13 @@ app.get('/:action/:radio/:delay', function(request, response) {
 			}
 
 			log.info("listen: send initial buffer of " + initialBuffer.length + " bytes");
+
+			switch(radioObj.codec) {
+				case "AAC": response.set('Content-Type', 'audio/aacp'); break;
+				case "MP3": response.set('Content-Type', 'audio/mpeg'); break;
+				default: log.warn("unsupported codec: " + radioObj.codec);
+			}
+
 			response.write(initialBuffer);
 
 			var finish = function() {

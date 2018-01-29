@@ -277,6 +277,7 @@ module.exports = function(radio, options) {
 		//metadataCallback(metadata);
 		radio.url = metadata.url;
 		radio.favicon = metadata.favicon;
+		radio.codec = metadata.codec;
 		var db = new Db({
 			country: radio.country,
 			name: radio.name,
