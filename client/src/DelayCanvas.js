@@ -43,11 +43,12 @@ class DelayCanvas extends Component {
 	}
 
 	play(delay) {
-		this.props.playCallback(null, delay);
+		console.log("play with delay=" + delay);
+		this.props.playCallback(delay);
 	}
 
 	getCursorPosition(event) {
-		if (this.props.inactive) return;
+		//if (this.props.inactive) return;
 		var rect = this.refs.canvas.getBoundingClientRect();
 		var x = event.clientX - rect.left;
 
@@ -82,26 +83,27 @@ class DelayCanvas extends Component {
 
 		ctx.clearRect(0, 0, width, height);
 
-		if (this.props.inactive) {
+		/*if (this.props.inactive) {
 			ctx.fillStyle = colors.GREY;
 			return ctx.fillRect(0, 0, width, height);
+		}*/
+
+		if (this.props.playing) {
+			var cursorX = this.delayToX(width, this.props.playingDelay);
+			ctx.fillStyle = colors.LIGHT_PINK;
+			ctx.fillRect(0, 0, cursorX, this.props.classList ? 0.4*height : height);
+
+			ctx.cursor = function(x, y, height, width) {
+				this.fillStyle = colors.PINK;
+				this.beginPath();
+				this.moveTo(x, y);
+				this.lineTo(Math.round(x+width/2), Math.round(y-height));
+				this.lineTo(Math.round(x-width/2), Math.round(y-height));
+				this.fill()
+			}
+
+			ctx.cursor(cursorX, 0.6*height, 0.6*height, 0.3*height);
 		}
-
-
-		var cursorX = this.delayToX(width, this.props.playingDelay);
-		ctx.fillStyle = colors.LIGHT_PINK;
-		ctx.fillRect(0, 0, cursorX, this.props.classList ? 0.4*height : height);
-
-		ctx.cursor = function(x, y, height, width) {
-			this.fillStyle = colors.PINK;
-			this.beginPath();
-			this.moveTo(x, y);
-			this.lineTo(Math.round(x+width/2), Math.round(y-height));
-			this.lineTo(Math.round(x-width/2), Math.round(y-height));
-			this.fill()
-		}
-
-		ctx.cursor(cursorX, 0.6*height, 0.6*height, 0.3*height);
 
 		// fill unavailable audio in grey
 		//var startCache = this.getAvailableCache();
@@ -165,11 +167,12 @@ DelayCanvas.propTypes = {
 }*/
 
 var canvasStyle = {
-	position: "absolute",
+	/*position: "absolute",*/
 	/*width: "800px",*/
 	minWidth: "100%",
 	height: "40px",
 	alignSelf: "flex-start",
+	marginTop: "10px"
 }
 
 export default DelayCanvas;

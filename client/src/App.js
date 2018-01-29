@@ -2,8 +2,8 @@
 
 import React, { Component } from 'react';
 import './App.css';
-import Radio from './Radio.js';
-import Metadata from './Metadata.js';
+//import Radio from './Radio.js';
+//import Metadata from './Metadata.js';
 import DelayCanvas from './DelayCanvas.js';
 import Playlist from './Playlist.js';
 
@@ -18,6 +18,8 @@ import iconPlay from "./img/start_1279169.svg";
 import iconStop from "./img/stop_1279170.svg";
 import iconList from "./img/list_241386.svg";
 //import iconNext from "./img/next_607554.svg";
+import defaultCover from "./img/default_radio_logo.svg";
+
 
 class App extends Component {
 	constructor(props) {
@@ -124,7 +126,7 @@ class App extends Component {
 				playingLive: delay === 0
 			});
 
-			play(HOST + "/listen/" + radio + "/" + Math.round(delay/1000) + "?t=" + Math.round(Math.random()*1000000));
+			play(HOST + "/listen/" + encodeURIComponent(radio) + "/" + Math.round(delay/1000) + "?t=" + Math.round(Math.random()*1000000));
 			document.title = radio.split("_")[1] + " - Adblock Radio";
 		} else {
 			this.setState({
@@ -232,59 +234,68 @@ class App extends Component {
 		return (
 			<AppParent>
 				<AppView>
-					<RadioList className={classNames({ withPreview: !self.state.playingRadio && !self.state.playlistEditMode })}>
-						{config.radios.map(function(radio, i) {
-							var playing = self.state.playingRadio === radio.country + "_" + radio.name;
-							var showMetadata = !self.state.playingRadio && !self.state.playlistEditMode;
+					<RadioList>
+						{config.radios.map(function(radioObj, i) {
+							var radio = radioObj.country + "_" + radioObj.name;
+							var playing = self.state.playingRadio === radio;
+							var showMetadata = !self.state.playlistEditMode;
 							var liveMetadata;
 							if (showMetadata) {
-								var metaList = self.state[radio.country + "_" + radio.name + "|metadata"];
+								var metaList = self.state[radio + "|metadata"];
 								if (metaList) {
 									for (let j=0; j<metaList.length; j++) {
-										if (metaList[j].validFrom - 1000 <= (self.state.date-self.defaultDelay(radio.country + "_" + radio.name)) &&
-											(!metaList[j].validTo || (self.state.date-self.defaultDelay(radio.country + "_" + radio.name) < +metaList[j].validTo - 1000)))
+										if (metaList[j].validFrom - 1000 <= (self.state.date-self.defaultDelay(radio)) &&
+											(!metaList[j].validTo || (self.state.date-self.defaultDelay(radio) < +metaList[j].validTo - 1000)))
 										{
-											liveMetadata = [metaList[j]];
+											liveMetadata = metaList[j];
 											break;
 										}
 									}
 								}
 							}
 							return (
-								<Radio metadata={radio}
-									playCallback={self.play}
-									playing={playing}
-									showMetadata={showMetadata}
-									liveMetadata={liveMetadata}
-									key={"radio" + i} />
+								<RadioItem className={classNames({ playing: playing })}
+									id={"RadioItem" + i}
+									key={"RadioItem" + i}>
+
+									<RadioItemTopLine onClick={function() { self.play(radio); }}>
+										<RadioLogo src={radioObj.favicon} alt="logo" />
+										{showMetadata && liveMetadata &&
+											<MetadataItem>
+												<MetadataText>
+													{liveMetadata.payload.artist} - {liveMetadata.payload.title}
+												</MetadataText>
+												<MetadataCover src={liveMetadata.payload.cover || defaultCover} alt="logo" />
+											</MetadataItem>
+										}
+									</RadioItemTopLine>
+
+									{showMetadata && self.state[radio + "|metadata"] &&
+										<DelayCanvas playingDelay={self.state.playingDelay}
+											availableCache={self.state[radio + "|available"]}
+											classList={self.state[radio + "|class"]}
+											date={new Date(+self.state.date - self.state.clockDiff)}
+											playing={playing}
+											cacheLen={self.state.config.user.cacheLen}
+											width={self.state.canvasWidth || 100}
+											playCallback={function(delay) { self.play(radio, delay); }} />
+									}
+
+								</RadioItem>
 							)
 						})}
 					</RadioList>
-					{self.state.playingRadio && !self.state.playlistEditMode && config.radios.length > 0 &&
-						<Metadata playingRadio={self.state.playingRadio}
-							playingDelay={self.state.playingDelay}
-							metaList={self.state[self.state.playingRadio + "|metadata"]}
-							date={new Date(+self.state.date - self.state.clockDiff)}
-							playCallback={self.play} />
-					}
 					{(self.state.playlistEditMode || config.radios.length === 0) &&
 						<Playlist config={self.state.config}
 							insertRadio={self.insertRadio}
 							removeRadio={self.removeRadio} />
 					}
 				</AppView>
-				<Controls id="controls">
+				<Controls>
 					{status}
 					{buttons}
 					{/*metaList={self.state[self.state.playingRadio + "|metadata"]}*/}
-					<DelayCanvas playingDelay={self.state.playingDelay}
-						availableCache={self.state[self.state.playingRadio + "|available"]}
-						classList={self.state[self.state.playingRadio + "|class"]}
-						date={new Date(+self.state.date - self.state.clockDiff)}
-						inactive={!self.state.playingRadio || !self.state[self.state.playingRadio + "|metadata"]}
-						cacheLen={self.state.config.user.cacheLen}
-						width={self.state.canvasWidth || 100}
-						playCallback={self.play} />
+
 					{/*<PlayerStatus settings={this.props.settings} bsw={this.props.bsw} condensed={this.props.condensed} playbackAction={this.togglePlayer} />*/}
 				</Controls>
 			</AppParent>
@@ -292,7 +303,7 @@ class App extends Component {
 	}
 
 	componentDidUpdate() {
-		var canvasContainerDom = document.getElementById('controls');
+		var canvasContainerDom = document.getElementById('RadioItem0');
 		if (!canvasContainerDom) return;
 		var cs = getComputedStyle(canvasContainerDom);
 		var canvasWidth = parseInt(cs.getPropertyValue('width'), 10);
@@ -317,17 +328,61 @@ const RadioList = styled.div`
 	flex-grow: 0;
 	flex-direction: column;
 	align-self: flex-start;
+	flex-grow: 1;
+`;
 
-	&.withPreview {
-		flex-grow: 1;
+const RadioItem = styled.div`
+	border: 2px solid grey;
+	border-radius: 10px;
+	margin: 10px 10px 0px 10px;
+	padding: 10px 10px 10px 10px;
+	flex-shrink: 0;
+	display: flex;
+	cursor: pointer;
+	flex-direction: column;
+
+	&.playing {
+		border: 2px solid red;
 	}
 `;
 
+const RadioItemTopLine = styled.div`
+	display: flex;
+	flex-direction: row;
+`;
+
+const RadioLogo = styled.img`
+	height: 80px;
+	width: 80px;
+`;
+
+const MetadataItem = styled.div`
+	flex-grow: 1;
+	margin: 0 0 0 15px;
+	padding: 10px;
+	flex-shrink: 0;
+	background: #eee;
+	display: flex;
+	cursor: pointer;
+`;
+
+const MetadataText = styled.p`
+	flex-grow: 1;
+	align-self: center;
+`
+
+const MetadataCover = styled.img`
+	width: 60px;
+	height: 60px;
+	align-self: center;
+	margin-left: 10px;
+`;
+
+
 const Controls = styled.div`
-	margin: -100px 0 0 0px;
 	z-index: 1000;
 	background: #eee;
-	height: 100px;
+	height: 60px;
 	align-items: center;
 	display: flex;
 	border-top: 2px solid #888;
@@ -338,7 +393,7 @@ const Controls = styled.div`
 `;
 
 const StatusTextContainer = styled.span`
-	padding: 40px 20px 0 20px;
+	padding: 0px 20px 0 20px;
 `;
 
 const StatusClock = styled.span`
@@ -353,7 +408,7 @@ const PlaybackButton = styled.img`
 	height: 40px;
 	margin-right: 10px;
 	cursor: pointer;
-	margin-top: 35px;
+	margin-top: 0px;
 
 	&.flip {
 		transform: rotate(180deg);

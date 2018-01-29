@@ -83,17 +83,39 @@ class AudioCache extends Writable {
 		super();
 		this.cacheLen = options.cacheLen;
 		this.bitrate = options.bitrate;
-		this.flushAmount = this.cacheLen * this.bitrate * 0.1;
+		this.bitrateValidated = false;
+		this.flushAmount = 60 * this.bitrate;
 		this.readCursor = null;
 		this.buffer = Buffer.allocUnsafe(this.cacheLen * this.bitrate + 2*this.flushAmount).fill(0);
 		this.writeCursor = 0;
 	}
 
 	_write(data, enc, next) {
+		if (this.writeCursor + data.length > this.buffer.length) {
+			log.warn("AudioCache: _write: buffer overflow wC=" + this.writeCursor + " dL=" + data.length + " bL=" + this.buffer.length);
+		}
 		data.copy(this.buffer, this.writeCursor);
 		this.writeCursor += data.length;
 
 		//log.debug("AudioCache: _write: add " + data.length + " to buffer, new len=" + this.buffer.length);
+		if (this.writeCursor >= this.flushAmount && !this.bitrateValidated) {
+			var self = this;
+			this.evalBitrate(this.buffer, function(bitrate) {
+				if (!isNaN(bitrate) && bitrate > 0 && self.bitrate != bitrate) {
+					log.info("AudioCache: bitrate adjusted from " + self.bitrate + "bps to " + bitrate + "bps");
+
+					// if bitrate is higher than expected, expand the buffer accordingly.
+					if (bitrate > self.bitrate) {
+						var expandBuf = Buffer.allocUnsafe(self.cacheLen * (bitrate - self.bitrate)).fill(0);
+						log.info("AudioCache: buffer expanded from " + self.buffer.length + " to " + (self.buffer.length + expandBuf.length) + " bytes");
+						self.buffer = Buffer.concat([ self.buffer, expandBuf ]);
+					}
+					self.bitrate = bitrate;
+				}
+			});
+			this.bitrateValidated = true;
+		}
+
 		if (this.writeCursor >= this.cacheLen * this.bitrate + this.flushAmount) {
 			//log.debug("AudioCache: _write: cutting buffer at len = " + this.cacheLen * this.bitrate);
 			this.buffer.copy(this.buffer, 0, this.flushAmount);
@@ -138,13 +160,36 @@ class AudioCache extends Writable {
 		} else if (nextCursor >= this.writeCursor) {
 			log.warn("AudioCache: readAmountAfterCursor: will read until " + this.writeCursor + " instead of " + nextCursor);
 		}
+		nextCursor = Math.min(this.writeCursor, nextCursor);
 		var data = this.buffer.slice(this.readCursor, nextCursor);
-		this.readCursor = Math.min(this.writeCursor, nextCursor);
+		this.readCursor = nextCursor;
 		return data;
 	}
 
 	getAvailableCache() {
 		return this.buffer ? this.writeCursor / this.bitrate : 0;
+	}
+
+	evalBitrate(buffer, callback) {
+		var tmpPath = "/tmp/" + Math.floor(Math.random() * 1000000000);
+		fs.writeFile(tmpPath, buffer, function(err) {
+			if (err) {
+				log.warn("evalBitrate: could not write temp file. err=" + err);
+				return callback(null);
+			}
+			cp.exec("ffmpeg -i 'file:" + tmpPath + "' 2>&1 | grep bitrate", function(error, stdout, stderr) {
+				//log.debug("evalBitrate: stdout: " + stdout + ", stderr: " + stderr + ", error: " + error);
+				var indexStartBitrate = stdout.indexOf("bitrate:") + 9;
+				var output = stdout.slice(indexStartBitrate, stdout.length-1);
+				//log.debug("evalBitrate: output1: " + output);
+				var indexStopBitrate = output.indexOf("kb/s") - 1;
+				output = output.slice(0, indexStopBitrate);
+				//log.debug("evalBitrate: output2: ||" + output + "||");
+				var ffmpegBitrate = 1000 * parseInt(output) / 8;
+				//log.debug("evalBitrate: bitrate: " + ffmpegBitrate);
+				return callback(ffmpegBitrate);
+			});
+		});
 	}
 }
 
