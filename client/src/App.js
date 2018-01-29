@@ -242,7 +242,8 @@ class App extends Component {
 								if (metaList) {
 									for (let j=0; j<metaList.length; j++) {
 										if (metaList[j].validFrom - 1000 <= (self.state.date-self.defaultDelay(radio.country + "_" + radio.name)) &&
-											(!metaList[j].validTo || (self.state.date-self.defaultDelay(radio.country + "_" + radio.name) < +metaList[j].validTo - 1000))) {
+											(!metaList[j].validTo || (self.state.date-self.defaultDelay(radio.country + "_" + radio.name) < +metaList[j].validTo - 1000)))
+										{
 											liveMetadata = [metaList[j]];
 											break;
 										}

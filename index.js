@@ -17,7 +17,7 @@ const SEG_DURATION = 10; // in seconds
 const LISTEN_BUFFER = 30; // in seconds
 var USE_ABRSDK = true;
 
-var { config, getRadios, insertRadio, removeRadio, getAvailableInactive } = require("./config.js");
+var { config, getRadios, getUserConfig, insertRadio, removeRadio, getAvailableInactive } = require("./config.js");
 
 var dl = [];
 var updateDlList = function() {
@@ -121,7 +121,7 @@ server.listen(9820, "localhost");
 
 app.get('/config', function(request, response) {
 	response.set({ 'Access-Control-Allow-Origin': '*' });
-	response.json({ radios: getRadios(), user: config.user });
+	response.json({ radios: getRadios(), user: getUserConfig() });
 });
 
 app.get('/config/radios/insert/:country/:name', function(request, response) {

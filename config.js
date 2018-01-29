@@ -89,6 +89,20 @@ var getRadios = function() {
 
 exports.getRadios = getRadios;
 
+
+var getUserConfig = function() {
+	var result = {};
+	Object.assign(result, {
+		config.user.cacheLen,
+		config.user.streamInitialBuffer,
+		config.user.streamGranularity,
+		config.user.maxRadios
+	});
+	return result;
+}
+
+exports.getUserConfig = getUserConfig;
+
 var saveRadios = function() {
 	var exportedRadios = getRadios();
 	fs.writeFile("config/radios.json", JSON.stringify(exportedRadios), function(err) {
