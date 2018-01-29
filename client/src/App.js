@@ -14,7 +14,7 @@ import * as moment from 'moment';
 import classNames from 'classnames';
 
 
-import iconPlay from "./img/start_1279169.svg";
+//import iconPlay from "./img/start_1279169.svg";
 import iconStop from "./img/stop_1279170.svg";
 import iconList from "./img/list_241386.svg";
 //import iconNext from "./img/next_607554.svg";
@@ -33,8 +33,8 @@ class App extends Component {
 			playlistEditMode: false
 		}
 		this.play = this.play.bind(this);
-		this.seekBackward = this.seekBackward.bind(this);
-		this.seekForward = this.seekForward.bind(this);
+		//this.seekBackward = this.seekBackward.bind(this);
+		//this.seekForward = this.seekForward.bind(this);
 		this.switchPlaylistEditMode = this.switchPlaylistEditMode.bind(this);
 		this.refreshMetadataContainer = this.refreshMetadataContainer.bind(this);
 		this.refreshConfig = this.refreshConfig.bind(this);
@@ -141,21 +141,15 @@ class App extends Component {
 		}
 	}
 
-	seekBackward() {
+	/*seekBackward() {
 		if (!this.state.playingRadio) return;
 		this.play(this.state.playingRadio, Math.min(this.state.playingDelay + 30000, this.state.config.user.cacheLen*1000));
 	}
 
 	seekForward() {
 		if (!this.state.playingRadio) return;
-		//var targetDate = +new Date(this.state.playingDate) + 30000;
-		/*if (targetDate > +new Date() - LIVE_DELAY) { // switch to live
-			this.play(this.state.playingRadio);
-		} else {
-			this.play(this.state.playingRadio, new Date(targetDate).toISOString());
-		}*/
 		this.play(this.state.playingRadio, Math.max(this.state.playingDelay - 30000,0));
-	}
+	}*/
 
 	switchPlaylistEditMode() {
 		this.setState({ playlistEditMode: !this.state.playlistEditMode });
@@ -223,9 +217,9 @@ class App extends Component {
 		var buttons = (
 			<StatusButtonsContainer>
 				<PlaybackButton className={classNames({ inactive: !self.state.playlistEditMode })} src={iconList} alt="Edit playlist" onClick={self.switchPlaylistEditMode} />
-				<PlaybackButton className={classNames({ flip: true, inactive: !self.state.playingRadio || self.state.playingDelay >= self.state.config.user.cacheLen*1000 })} src={iconPlay} alt="Backward 30s" onClick={self.seekBackward} />
+				{/*<PlaybackButton className={classNames({ flip: true, inactive: !self.state.playingRadio || self.state.playingDelay >= self.state.config.user.cacheLen*1000 })} src={iconPlay} alt="Backward 30s" onClick={self.seekBackward} />*/}
 				<PlaybackButton className={classNames({ inactive: !self.state.playingRadio })} src={iconStop} alt="Stop" onClick={() => self.play(null, null)} />
-				<PlaybackButton className={classNames({ inactive: !self.state.playingRadio || self.state.playingLive })} src={iconPlay} alt="Forward 30s" onClick={self.seekForward} />
+				{/*<PlaybackButton className={classNames({ inactive: !self.state.playingRadio || self.state.playingLive })} src={iconPlay} alt="Forward 30s" onClick={self.seekForward} />*/}
 			</StatusButtonsContainer>
 		);
 
@@ -329,6 +323,8 @@ const RadioList = styled.div`
 	flex-direction: column;
 	align-self: flex-start;
 	flex-grow: 1;
+	padding-bottom: 70px;
+	overflow-y: scroll;
 `;
 
 const RadioItem = styled.div`
@@ -360,7 +356,7 @@ const MetadataItem = styled.div`
 	flex-grow: 1;
 	margin: 0 0 0 15px;
 	padding: 10px;
-	flex-shrink: 0;
+	flex-shrink: 1;
 	background: #eee;
 	display: flex;
 	cursor: pointer;
@@ -394,6 +390,7 @@ const Controls = styled.div`
 
 const StatusTextContainer = styled.span`
 	padding: 0px 20px 0 20px;
+	flex-shrink: 1;
 `;
 
 const StatusClock = styled.span`
@@ -402,6 +399,7 @@ const StatusClock = styled.span`
 
 const StatusButtonsContainer = styled.span`
 	padding: 10px 0 0 0;
+	flex-shrink: 0;
 `;
 
 const PlaybackButton = styled.img`
