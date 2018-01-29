@@ -93,10 +93,10 @@ exports.getRadios = getRadios;
 var getUserConfig = function() {
 	var result = {};
 	Object.assign(result, {
-		config.user.cacheLen,
-		config.user.streamInitialBuffer,
-		config.user.streamGranularity,
-		config.user.maxRadios
+		cacheLen: config.user.cacheLen,
+		streamInitialBuffer: config.user.streamInitialBuffer,
+		streamGranularity: config.user.streamGranularity,
+		maxRadios: config.user.maxRadios
 	});
 	return result;
 }
