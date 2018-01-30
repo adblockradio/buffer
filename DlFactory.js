@@ -1,8 +1,7 @@
 "use strict";
 
 var { Writable, Duplex } = require("stream");
-var log = require("loglevel");
-log.setLevel("debug");
+var log = require("./log.js")("DlFactory");
 var cp = require("child_process");
 var fs = require("fs");
 var { getMeta } = require("webradio-metadata");

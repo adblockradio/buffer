@@ -3,8 +3,7 @@
 
 "use strict";
 
-var log = require("loglevel");
-log.setLevel("debug");
+var log = require("./log.js")("master");
 var cp = require("child_process");
 var findDataFiles = require("./findDataFiles.js");
 var async = require("async");
@@ -17,7 +16,7 @@ const SEG_DURATION = 10; // in seconds
 const LISTEN_BUFFER = 30; // in seconds
 var USE_ABRSDK = true;
 
-var { config, getRadios, getUserConfig, insertRadio, removeRadio, getAvailableInactive } = require("./config.js");
+var { config, getRadios, getUserConfig, insertRadio, removeRadio, toggleContent, getAvailableInactive } = require("./config.js");
 
 var dl = [];
 var updateDlList = function() {
@@ -73,7 +72,30 @@ var updateDlList = function() {
 			} else {
 				if (playlistArray.length != validatedPlaylist.length) {
 					log.warn("abrsdk: playlist not accepted. requested=" + JSON.stringify(playlistArray) + " validated=" + JSON.stringify(validatedPlaylist));
+				} else {
+					log.debug("abrsdk: playlist successfully updated");
 				}
+				abrsdk.setPredictionCallback(function(predictions) {
+					var status, volume;
+					for (var i=0; i<predictions.radios.length; i++) {
+						switch (predictions.status[i]) {
+							case abrsdk.statusList.STATUS_AD: status = "AD"; break;
+							case abrsdk.statusList.STATUS_SPEECH: status = "SPEECH"; break;
+							case abrsdk.statusList.STATUS_MUSIC: status = "MUSIC"; break;
+							default: status = "not available";
+						}
+						// normalized volume to apply to the audio tag to have similar loudness between channels
+						volume = Math.pow(10, (Math.min(abrsdk.GAIN_REF-predictions.gain[i],0))/20);
+						// you can now plug the data to your radio player.
+						//log.debug("abrsdk: " + predictions.radios[i] + " has status " + status + " and volume " + Math.round(volume*100)/100);
+						var radio = getRadio(predictions.radios[i]);
+						if (!radio || !radio.liveStatus || !radio.liveStatus.onClassPrediction) {
+							log.error("abrsdk: cannot call prediction callback");
+						} else {
+							radio.liveStatus.onClassPrediction(status, volume);
+						}
+					}
+				});
 			}
 		});
 	}
@@ -84,28 +106,6 @@ if (USE_ABRSDK) {
 		if (err) {
 			log.error("abrsdk: connection error: " + err + ". switch off sdk");
 			USE_ABRSDK = false;
-		} else {
-			abrsdk.setPredictionCallback(function(predictions) {
-				var status, volume;
-				for (var i=0; i<predictions.radios.length; i++) {
-					switch (predictions.status[i]) {
-						case abrsdk.statusList.STATUS_AD: status = "AD"; break;
-						case abrsdk.statusList.STATUS_SPEECH: status = "SPEECH"; break;
-						case abrsdk.statusList.STATUS_MUSIC: status = "MUSIC"; break;
-						default: status = "not available";
-					}
-					// normalized volume to apply to the audio tag to have similar loudness between channels
-					volume = Math.pow(10, (Math.min(abrsdk.GAIN_REF-predictions.gain[i],0))/20);
-					// you can now plug the data to your radio player.
-					//log.debug("abrsdk: " + predictions.radios[i] + " has status " + status + " and volume " + Math.round(volume*100)/100);
-					var radio = getRadio(predictions.radios[i]);
-					if (!radio || !radio.liveStatus || !radio.liveStatus.onClassPrediction) {
-						log.error("abrsdk: cannot call prediction callback");
-					} else {
-						radio.liveStatus.onClassPrediction(status, volume);
-					}
-				}
-			});
 		}
 		updateDlList();
 	});
@@ -132,10 +132,10 @@ app.get('/config/radios/insert/:country/:name', function(request, response) {
 		if (err) {
 			log.error("/config/insert/" + country + "/" + name + ": err=" + err);
 			response.writeHead(400);
-			response.end();
+			response.end("err=" + err);
 		} else {
 			response.writeHead(200);
-			response.end();
+			response.end("OK");
 			updateDlList();
 		}
 	});
@@ -149,10 +149,10 @@ app.get('/config/radios/remove/:country/:name', function(request, response) {
 		if (err) {
 			log.error("/config/remove/" + country + "/" + name + ": err=" + err);
 			response.writeHead(400);
-			response.end();
+			response.end("err=" + err);
 		} else {
 			response.writeHead(200);
-			response.end();
+			response.end("OK");
 			updateDlList();
 		}
 	});
@@ -161,6 +161,24 @@ app.get('/config/radios/remove/:country/:name', function(request, response) {
 app.get('/config/radios/available', function(request, response) {
 	response.set({ 'Access-Control-Allow-Origin': '*' });
 	response.json(getAvailableInactive());
+});
+
+app.get('/config/radios/content/:country/:name/:type/:enable', function(request, response) {
+	response.set({ 'Access-Control-Allow-Origin': '*' });
+	var country = decodeURIComponent(request.params.country);
+	var name = decodeURIComponent(request.params.name);
+	var type = decodeURIComponent(request.params.type);
+	var enable = decodeURIComponent(request.params.enable);
+	toggleContent(country, name, type, enable, function(err) {
+		if (err) {
+			log.error("/config/radios/content/" + country + "/" + name + "/" + type + "/" + enable + ": err=" + err);
+			response.writeHead(400);
+			response.end("err=" + err);
+		} else {
+			response.writeHead(200);
+			response.end("OK");
+		}
+	});
 });
 
 var getRadio = function(country, name) {
@@ -190,7 +208,7 @@ app.get('/:action/:radio/:delay', function(request, response) {
 
 	if (!getRadio(radio) || !getRadio(radio).enable) {
 		response.writeHead(400);
-		return response.end();
+		return response.end("radio not found");
 	}
 
 	switch(action) {
@@ -209,7 +227,7 @@ app.get('/:action/:radio/:delay', function(request, response) {
 			if (!initialBuffer) {
 				log.error("/listen/" + radio + "/" + delay + ": initialBuffer not available");
 				response.writeHead(400);
-				return response.end();
+				return response.end("buffer not available");
 			}
 
 			log.info("listen: send initial buffer of " + initialBuffer.length + " bytes");
@@ -274,21 +292,21 @@ app.get('/:action/:radio/:delay', function(request, response) {
 			if (!radio) {
 				log.error("/metadata/" + radio + "/" + delay + ": radio not available");
 				response.writeHead(400);
-				return response.end();
+				return response.end("radio not found");
 			} else if (!radio.liveStatus) {
 				log.error("/metadata/" + radio + "/" + delay + ": radio.liveStatus not available");
 				response.writeHead(400);
-				return response.end();
+				return response.end("radio not ready");
 			} else if (!radio.liveStatus.metaCache) {
 				log.error("/metadata/" + radio + "/" + delay + ": metadata not available");
 				response.writeHead(400);
-				return response.end();
+				return response.end("metadata not available");
 			}
 			response.json(radio.liveStatus.metaCache.read());
 			break;
 
 		default:
 			response.writeHead(400);
-			response.end();
+			response.end("unknown route");
 	}
 });

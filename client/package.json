@@ -5,6 +5,7 @@
   "dependencies": {
     "classnames": "^2.2.5",
     "moment": "^2.20.1",
+    "rc-checkbox": "^2.1.4",
     "react": "^16.1.1",
     "react-dom": "^16.1.1",
     "styled-components": "^2.4.0"
@@ -18,5 +19,5 @@
     "test": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject"
   },
-  "homepage" : "https://www.adblockradio.com/buffer"
+  "homepage": "https://www.adblockradio.com/buffer"
 }

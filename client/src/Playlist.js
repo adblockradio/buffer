@@ -5,6 +5,8 @@ import PropTypes from "prop-types";
 import styled from "styled-components";
 import { load } from './load.js';
 import classNames from 'classnames';
+import Checkbox from 'rc-checkbox';
+import 'rc-checkbox/assets/index.css';
 import defaultCover from "./img/default_radio_logo.svg";
 
 class Playlist extends Component {
@@ -41,6 +43,11 @@ class Playlist extends Component {
 		this.props.removeRadio(country, name, this.componentDidMount);
 	}
 
+	/*toggleContent(country, name, contentType, enabled) {
+		console.log("toggleContent radio=" + country + "_" + name + " contentType=" + contentType + " enable=" + enabled);
+		this.props.toggleContent(country, name, contentType, enabled, this.componentDidMount);
+	}*/
+
 	render() {
 		var self = this;
 		if (!this.state.radiosLoaded) {
@@ -67,11 +74,23 @@ class Playlist extends Component {
 				}
 				{current.map(function(radio, i) {
 					return (
-						<PlaylistItem className={classNames({ active: true })} key={"item" + i} onClick={function() { self.remove(radio.country, radio.name); }}>
-							<PlaylistItemText>
-								{radio.name}
-							</PlaylistItemText>
-							<PlaylistItemLogo src={radio.favicon || defaultCover} alt="logo" />
+						<PlaylistItem className={classNames({ active: true })} key={"item" + i}>
+							<PlaylistItemTopRow>
+								<PlaylistItemLogo src={radio.favicon || defaultCover} alt="logo" onClick={function() { self.remove(radio.country, radio.name); }} />
+								<PlaylistItemText onClick={function() { self.remove(radio.country, radio.name); }}>
+									{radio.name}
+								</PlaylistItemText>
+							</PlaylistItemTopRow>
+							<PlaylistItemConfigContainer>
+								<label>
+									<Checkbox
+										checked={!radio.content.ads}
+										onChange={(e) => self.props.toggleContent(radio.country, radio.name, "ads", !e.target.checked, self.componentDidMount)}
+										disabled={!self.props.config.user.token}
+									/>
+									&nbsp; skip ads
+								</label>
+							</PlaylistItemConfigContainer>
 						</PlaylistItem>
 					)
 				})}
@@ -83,10 +102,12 @@ class Playlist extends Component {
 				{available.map(function(radio, i) {
 					return (
 						<PlaylistItem className={classNames({ active: !playlistFull })} key={"item" + i} onClick={function() { if (!playlistFull) self.insert(radio.country, radio.name); }}>
-							<PlaylistItemText>
-								{radio.name}
-							</PlaylistItemText>
-							<PlaylistItemLogo src={radio.favicon || defaultCover} alt="logo" />
+							<PlaylistItemTopRow>
+								<PlaylistItemLogo src={radio.favicon || defaultCover} alt="logo" />
+								<PlaylistItemText>
+									{radio.name}
+								</PlaylistItemText>
+							</PlaylistItemTopRow>
 						</PlaylistItem>
 					)
 				})}
@@ -118,6 +139,7 @@ const PlaylistItem = styled.div`
 	flex-shrink: 0;
 	background: #eee;
 	display: flex;
+	flex-direction: column;
 	cursor: not-allowed;
 
 	&.active {
@@ -125,16 +147,26 @@ const PlaylistItem = styled.div`
 	}
 `;
 
+const PlaylistItemTopRow = styled.div`
+	display: flex;
+	flex-direction: row;
+	margin-bottom: 10px;
+`;
+
 const PlaylistItemText = styled.p`
 	flex-grow: 1;
 	align-self: center;
-`
+`;
 
 const PlaylistItemLogo = styled.img`
 	width: 60px;
 	height: 60px;
 	align-self: center;
-	margin-left: 10px;
+	margin-right: 10px;
+`;
+
+const PlaylistItemConfigContainer = styled.div`
+	flex-grow: 1;
 `;
 
 export default Playlist;

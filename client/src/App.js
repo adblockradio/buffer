@@ -40,6 +40,7 @@ class App extends Component {
 		this.refreshConfig = this.refreshConfig.bind(this);
 		this.insertRadio = this.insertRadio.bind(this);
 		this.removeRadio = this.removeRadio.bind(this);
+		this.toggleContent = this.toggleContent.bind(this);
 	}
 
 	componentDidMount() {
@@ -169,6 +170,13 @@ class App extends Component {
 		});
 	}
 
+	toggleContent(country, name, contentType, enabled, callback) {
+		var self = this;
+		load("/config/radios/content/" + encodeURIComponent(country) + "/" + encodeURIComponent(name) + "/" + encodeURIComponent(contentType) + "/" + (enabled ? "enable" : "disable") + "?t=" + Math.round(Math.random()*1000000), function(res) {
+			self.refreshConfig(callback);
+		});
+	}
+
 	render() {
 		let config = this.state.config;
 		var self = this;
@@ -225,65 +233,76 @@ class App extends Component {
 
 		//console.log("Metadata props: date=" + (+self.state.date) + " clockDiff=" + self.state.clockDiff + " playingDelay=" + self.state.playingDelay);
 
+		let mainContents;
+		if (self.state.playlistEditMode || config.radios.length === 0) {
+			mainContents = (
+				<Playlist config={self.state.config}
+					insertRadio={self.insertRadio}
+					removeRadio={self.removeRadio}
+					toggleContent={self.toggleContent} />
+			);
+		} else {
+			mainContents = (
+				<RadioList>
+					{config.radios.map(function(radioObj, i) {
+						var radio = radioObj.country + "_" + radioObj.name;
+						var playing = self.state.playingRadio === radio;
+
+						var liveMetadata;
+
+						var metaList = self.state[radio + "|metadata"];
+						if (metaList) {
+							var targetDate = self.state.date - (playing ? self.state.playingDelay : self.defaultDelay(radio));
+							for (let j=0; j<metaList.length; j++) {
+								if (metaList[j].validFrom - 1000 <= targetDate &&
+									(!metaList[j].validTo || (targetDate < +metaList[j].validTo - 1000)))
+								{
+										liveMetadata = metaList[j];
+										break;
+								}
+							}
+						}
+
+						return (
+							<RadioItem className={classNames({ playing: playing })}
+								id={"RadioItem" + i}
+								key={"RadioItem" + i}>
+
+								<RadioItemTopLine onClick={function() { self.play(radio); }}>
+									<RadioLogo src={radioObj.favicon} alt="logo" />
+									{liveMetadata &&
+										<MetadataItem>
+											<MetadataText>
+												{liveMetadata.payload.artist} - {liveMetadata.payload.title}
+											</MetadataText>
+											<MetadataCover src={liveMetadata.payload.cover || defaultCover} alt="logo" />
+										</MetadataItem>
+									}
+								</RadioItemTopLine>
+
+								{metaList &&
+									<DelayCanvas playingDelay={self.state.playingDelay}
+										availableCache={self.state[radio + "|available"]}
+										classList={self.state[radio + "|class"]}
+										date={new Date(+self.state.date - self.state.clockDiff)}
+										playing={playing}
+										cacheLen={self.state.config.user.cacheLen}
+										width={self.state.canvasWidth || 100}
+										playCallback={function(delay) { self.play(radio, delay); }} />
+								}
+
+							</RadioItem>
+						)
+					})}
+				</RadioList>
+			);
+		}
+
+
 		return (
 			<AppParent>
 				<AppView>
-					<RadioList>
-						{config.radios.map(function(radioObj, i) {
-							var radio = radioObj.country + "_" + radioObj.name;
-							var playing = self.state.playingRadio === radio;
-							var showMetadata = !self.state.playlistEditMode;
-							var liveMetadata;
-							if (showMetadata) {
-								var metaList = self.state[radio + "|metadata"];
-								if (metaList) {
-									for (let j=0; j<metaList.length; j++) {
-										if (metaList[j].validFrom - 1000 <= (self.state.date-self.defaultDelay(radio)) &&
-											(!metaList[j].validTo || (self.state.date-self.defaultDelay(radio) < +metaList[j].validTo - 1000)))
-										{
-											liveMetadata = metaList[j];
-											break;
-										}
-									}
-								}
-							}
-							return (
-								<RadioItem className={classNames({ playing: playing })}
-									id={"RadioItem" + i}
-									key={"RadioItem" + i}>
-
-									<RadioItemTopLine onClick={function() { self.play(radio); }}>
-										<RadioLogo src={radioObj.favicon} alt="logo" />
-										{showMetadata && liveMetadata &&
-											<MetadataItem>
-												<MetadataText>
-													{liveMetadata.payload.artist} - {liveMetadata.payload.title}
-												</MetadataText>
-												<MetadataCover src={liveMetadata.payload.cover || defaultCover} alt="logo" />
-											</MetadataItem>
-										}
-									</RadioItemTopLine>
-
-									{showMetadata && self.state[radio + "|metadata"] &&
-										<DelayCanvas playingDelay={self.state.playingDelay}
-											availableCache={self.state[radio + "|available"]}
-											classList={self.state[radio + "|class"]}
-											date={new Date(+self.state.date - self.state.clockDiff)}
-											playing={playing}
-											cacheLen={self.state.config.user.cacheLen}
-											width={self.state.canvasWidth || 100}
-											playCallback={function(delay) { self.play(radio, delay); }} />
-									}
-
-								</RadioItem>
-							)
-						})}
-					</RadioList>
-					{(self.state.playlistEditMode || config.radios.length === 0) &&
-						<Playlist config={self.state.config}
-							insertRadio={self.insertRadio}
-							removeRadio={self.removeRadio} />
-					}
+					{mainContents}
 				</AppView>
 				<Controls>
 					{status}
@@ -312,7 +331,8 @@ const AppParent = styled.div`
 
 const AppView = styled.div`
 	display: flex;
-	height: calc(100% - 100px);
+	height: calc(100% - 60px);
+	margin: 0 10px;
 `;
 
 const RadioList = styled.div`
@@ -355,7 +375,7 @@ const RadioLogo = styled.img`
 const MetadataItem = styled.div`
 	flex-grow: 1;
 	margin: 0 0 0 15px;
-	padding: 10px;
+	padding: 0 10px;
 	flex-shrink: 1;
 	background: #eee;
 	display: flex;
@@ -365,6 +385,7 @@ const MetadataItem = styled.div`
 const MetadataText = styled.p`
 	flex-grow: 1;
 	align-self: center;
+	margin: 10px 0;
 `
 
 const MetadataCover = styled.img`

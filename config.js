@@ -1,6 +1,6 @@
 "use strict";
 
-var log = require("loglevel");
+var log = require("./log.js")("config");
 var fs = require("fs");
 var { getRadioMetadata } = require("../adblockradio-dl/dl.js");
 var { getAvailable } = require("webradio-metadata");
@@ -30,7 +30,7 @@ var isRadioInConfig = function(country, name) {
 	return isAlreadyThere;
 }
 
-var insertRadio = function(country, name, callback) {
+exports.insertRadio = function(country, name, callback) {
 	if (isRadioInConfig()) return callback("Radio already in the list");
 	if (config.radios.length >= config.user.maxRadios) return callback("Playlist is already full");
 
@@ -43,7 +43,7 @@ var insertRadio = function(country, name, callback) {
 				"country": country,
 				"name": name,
 				"content": {
-					"ads": true,
+					"ads": false,
 					"speech": true,
 					"music": true
 				},
@@ -55,7 +55,7 @@ var insertRadio = function(country, name, callback) {
 	});
 }
 
-var removeRadio = function(country, name, callback) {
+exports.removeRadio = function(country, name, callback) {
 
 	for (var i=0; i<config.radios.length; i++) {
 		if (config.radios[i].country == country && config.radios[i].name == name) {
@@ -67,10 +67,21 @@ var removeRadio = function(country, name, callback) {
 	return callback("Radio not in the list");
 }
 
-exports.insertRadio = insertRadio;
-exports.removeRadio = removeRadio;
+exports.toggleContent = function(country, name, type, enable, callback) {
+	if (enable != "enable" && enable != "disable") {
+		return callback("keywords allowed are 'enable' and 'disable'");
+	}
+	for (var i=0; i<config.radios.length; i++) {
+		if (config.radios[i].country == country && config.radios[i].name == name) {
+			config.radios[i].content[type] = (enable == "enable") ? true : false;
+			saveRadios();
+			return callback(null);
+		}
+	}
+	return callback("Radio not in the list");
+}
 
-var getRadios = function() {
+exports.getRadios = function() {
 	var radios = [];
 	for (var i=0; i<config.radios.length; i++) { // control on what data is exposed via the api
 		var radio = config.radios[i];
@@ -87,12 +98,11 @@ var getRadios = function() {
 	return radios;
 }
 
-exports.getRadios = getRadios;
-
 
 var getUserConfig = function() {
 	var result = {};
 	Object.assign(result, {
+		token: config.user.token ? true : false,
 		cacheLen: config.user.cacheLen,
 		streamInitialBuffer: config.user.streamInitialBuffer,
 		streamGranularity: config.user.streamGranularity,
@@ -104,7 +114,7 @@ var getUserConfig = function() {
 exports.getUserConfig = getUserConfig;
 
 var saveRadios = function() {
-	var exportedRadios = getRadios();
+	var exportedRadios = exports.getRadios();
 	fs.writeFile("config/radios.json", JSON.stringify(exportedRadios), function(err) {
 		if (err) {
 			log.error("saveRadios: could not save radio config. err=" + err);
