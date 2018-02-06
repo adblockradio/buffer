@@ -29,8 +29,13 @@ var stop = function() {
 	}
 }
 
+var setVolume = function(volume) {
+	audioElement.volume = volume;
+}
+
 exports.play = play;
 exports.stop = stop;
+exports.setVolume = setVolume;
 /*exports.getPlayerTime = function(startDate) {
 	if (!startDate) {
 		console.log("getPlayerTime: invalid startdate=" + startDate);

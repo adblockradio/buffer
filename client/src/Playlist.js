@@ -8,6 +8,7 @@ import classNames from 'classnames';
 import Checkbox from 'rc-checkbox';
 import 'rc-checkbox/assets/index.css';
 import defaultCover from "./img/default_radio_logo.svg";
+import userIcon from "./img/user_1085539.svg";
 
 class Playlist extends Component {
 	constructor(props) {
@@ -60,15 +61,25 @@ class Playlist extends Component {
 		var available = this.state.radios;
 		var playlistFull = this.props.config.radios.length >= this.props.config.user.maxRadios;
 		var playlistEmpty = this.props.config.radios.length === 0;
+		var loggedAs = self.props.config.user.email;
 
 		return (
 			<PlaylistContainer>
-				<p>
-					Adblock Radio Buffer. Tous droits réservés, Alexandre Storelli, 2018.<br />
-					Ce site n'a pas vocation à être diffusé au public.<br />
-					Il est mis à disposition pour un usage strictement limité à fins de démonstration.<br />
-					L'écoute est limitée à un seul utilisateur simultané.
-				</p>
+				<PlaylistSectionTitle>Terms of use</PlaylistSectionTitle>
+				<PlaylistItem>
+					<TOSContainer>
+						Adblock Radio Buffer. Tous droits réservés, Alexandre Storelli, 2018.<br />
+						Ce site n'a pas vocation à être diffusé au public.<br />
+						Il est mis à disposition pour un usage strictement limité à fins de démonstration.<br />
+						L'écoute est limitée à un seul utilisateur simultané.
+					</TOSContainer>
+					{loggedAs &&
+						<TOSContainer>
+							<LoginIcon src={userIcon} />
+							<span>Connecté à Adblock Radio avec le compte {loggedAs}</span>
+						</TOSContainer>
+					}
+				</PlaylistItem>
 				{!playlistEmpty &&
 					<PlaylistSectionTitle>Your current favorites : click to remove</PlaylistSectionTitle>
 				}
@@ -82,14 +93,18 @@ class Playlist extends Component {
 								</PlaylistItemText>
 							</PlaylistItemTopRow>
 							<PlaylistItemConfigContainer>
-								<label>
-									<Checkbox
-										checked={!radio.content.ads}
-										onChange={(e) => self.props.toggleContent(radio.country, radio.name, "ads", !e.target.checked, self.componentDidMount)}
-										disabled={!self.props.config.user.token}
-									/>
-									&nbsp; skip ads
-								</label>
+								{["ads", "speech"].map(function(type, j) {
+									return (
+										<PlaylistItemConfigItem key={"item" + i + "config" + j}>
+											<Checkbox
+												checked={!radio.content[type] && !!self.props.config.user.email}
+												onChange={(e) => self.props.toggleContent(radio.country, radio.name, type, !e.target.checked, self.componentDidMount)}
+												disabled={!self.props.config.user.email}
+											/>
+											&nbsp; skip {type}
+										</PlaylistItemConfigItem>
+									)
+								})}
 							</PlaylistItemConfigContainer>
 						</PlaylistItem>
 					)
@@ -125,10 +140,24 @@ Playlist.propTypes = {
 const PlaylistContainer = styled.div`
 	flex-grow: 1;
 	overflow-y: scroll;
+	padding-bottom: 60px;
 `;
 
 const PlaylistSectionTitle = styled.h3`
 	text-align: center;
+	margin: 10px 10px 0px 10px;
+`;
+
+const TOSContainer = styled.p`
+	margin: 10px;
+	text-align: center;
+	font-size: 12px;
+`;
+
+const LoginIcon = styled.img`
+	width: 32px;
+	vertical-align: middle;
+	margin: 0 10px 0 0;
 `;
 
 const PlaylistItem = styled.div`
@@ -137,7 +166,7 @@ const PlaylistItem = styled.div`
 	margin: 10px;
 	padding: 10px;
 	flex-shrink: 0;
-	background: #eee;
+	background: white;
 	display: flex;
 	flex-direction: column;
 	cursor: not-allowed;
@@ -163,10 +192,15 @@ const PlaylistItemLogo = styled.img`
 	height: 60px;
 	align-self: center;
 	margin-right: 10px;
+	border: 1px solid grey;
 `;
 
 const PlaylistItemConfigContainer = styled.div`
 	flex-grow: 1;
+`;
+
+const PlaylistItemConfigItem = styled.label`
+	margin-right: 10px;
 `;
 
 export default Playlist;

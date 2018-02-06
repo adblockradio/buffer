@@ -8,7 +8,7 @@ import DelayCanvas from './DelayCanvas.js';
 import Playlist from './Playlist.js';
 
 import { load, refreshMetadata, refreshAvailableCache, HOST } from './load.js';
-import { play, stop } from './audio.js';
+import { play, stop, setVolume } from './audio.js';
 import styled from "styled-components";
 import * as moment from 'moment';
 import classNames from 'classnames';
@@ -28,7 +28,6 @@ class App extends Component {
 			configLoaded: false,
 			config: [],
 			playingRadio: null,
-			playingDate: null,
 			clockDiff: 0,
 			playlistEditMode: false
 		}
@@ -99,7 +98,98 @@ class App extends Component {
 	}
 
 	tick() {
-		this.setState({ date: new Date() });
+		this.setState({ date: new Date() }, function() {
+			this.changeChannelIfNeeded();
+		});
+	}
+
+	acceptableContent(iRadio, classObj) {
+		return ((this.state.config.radios[iRadio].content.ads || classObj.payload !== "AD") &&
+			(this.state.config.radios[iRadio].content.speech || classObj.payload !== "SPEECH"))
+	}
+
+	changeChannelIfNeeded() {
+		var DEBUG = true;
+		if (!this.state.playingRadio || !this.state.playingDelay) {
+			return; // we are not playing anything
+		}
+
+		var i;
+		var iPlayingRadio = -1;
+		for (i=0; i<this.state.config.radios.length; i++) {
+			var radio = this.state.config.radios[i];
+			if (this.state.playingRadio === radio.country + "_" + radio.name) {
+				iPlayingRadio = i;
+				break;
+			}
+		}
+
+		var classes = this.state[this.state.playingRadio + "|class"];
+		if (!classes) {
+			if (DEBUG) console.log("no classes metadata to use");
+			return; // no classes metadata to use
+		}
+
+		var iCurrentClass = -1;
+		var playingEpoch = +this.state.date - this.state.playingDelay;
+		for (i=classes.length-1; i>=0; i--) {
+			if (classes[i].validFrom <= playingEpoch && (!classes[i].validTo || playingEpoch < classes[i].validTo)) {
+				iCurrentClass = i;
+				break;
+			}
+		}
+		if (iCurrentClass < 0) {
+			if (DEBUG) console.log("there are no metadata available for the current playing position.");
+			return; // there are no metadata available for the current playing position.
+		}
+
+		if (!this.acceptableContent(iPlayingRadio, classes[iCurrentClass])) {
+			// we should change. first try classes at later times, i.e. lower indexes.
+			var iTargetClass = -1;
+			for (i=iCurrentClass; i>=0; i--) {
+				if (this.acceptableContent(iPlayingRadio, classes[i])
+					&& (!classes[i].validTo || classes[i].validTo - classes[i].validFrom > this.state.config.user.discardSmallSegments*1000)) {
+					iTargetClass = i;
+					break;
+				}
+			}
+
+			if (iTargetClass >= 0) {
+				var delay = +this.state.date - classes[iTargetClass].validFrom;
+				if (DEBUG) console.log("fast forward to delay " + delay);
+				return this.play(this.state.playingRadio, delay);
+			}
+
+			// otherwise, we change channel if possible
+			var listRadiosToTry = [];
+			for (i=iPlayingRadio + 1; i<this.state.config.radios.length; i++) {
+				listRadiosToTry.push(i);
+			}
+			for (i=0; i<iPlayingRadio; i++) {
+				listRadiosToTry.push(i);
+			}
+
+			for (i=0; i<listRadiosToTry.length; i++) {
+				var radioObj = this.state.config.radios[listRadiosToTry[i]];
+				var triedRadioName = radioObj.country + "_" + radioObj.name;
+				classes = this.state[triedRadioName + "|class"];
+				if (!classes) continue;
+				for (var j=classes.length-1; j>=0; j--) {
+					if ((!classes[j].validTo || classes[j].validTo > this.defaultDelay(triedRadioName))
+						&& this.acceptableContent(listRadiosToTry[i], classes[j])
+						&& (!classes[j].validTo || classes[j].validTo - classes[j].validFrom > this.state.config.user.discardSmallSegments*1000)) {
+
+						delay = Math.min(+this.state.date - classes[j].validFrom, this.defaultDelay(triedRadioName));
+						if (DEBUG) console.log("hop to " + triedRadioName + " at delay " + delay);
+						return this.play(triedRadioName, delay);
+					}
+				}
+			}
+
+			// as a last resort, turn down the volume
+			if (DEBUG) console.log("no alt content to play, lower volume");
+			setVolume(0.1);
+		}
 	}
 
 	defaultDelay(radio) {
@@ -118,6 +208,7 @@ class App extends Component {
 			} else if (delay > this.state.config.user.cacheLen*1000) {
 				delay = this.state.config.user.cacheLen*1000;
 			}
+			delay = Math.round(delay/1000)*1000;
 
 			console.log("Play: radio=" + radio + " delay=" + delay);
 			this.setState({
@@ -127,7 +218,8 @@ class App extends Component {
 				playingLive: delay === 0
 			});
 
-			play(HOST + "/listen/" + encodeURIComponent(radio) + "/" + Math.round(delay/1000) + "?t=" + Math.round(Math.random()*1000000));
+			setVolume(1);
+			play(HOST + "/listen/" + encodeURIComponent(radio) + "/" + (delay/1000) + "?t=" + Math.round(Math.random()*1000000));
 			document.title = radio.split("_")[1] + " - Adblock Radio";
 		} else {
 			this.setState({
@@ -326,13 +418,12 @@ class App extends Component {
 }
 
 const AppParent = styled.div`
-	height: 100%;
+	background: #98b3ff;
 `;
 
 const AppView = styled.div`
 	display: flex;
 	height: calc(100% - 60px);
-	margin: 0 10px;
 `;
 
 const RadioList = styled.div`
@@ -344,7 +435,7 @@ const RadioList = styled.div`
 	align-self: flex-start;
 	flex-grow: 1;
 	padding-bottom: 70px;
-	overflow-y: scroll;
+	overflow-y: auto;
 `;
 
 const RadioItem = styled.div`
@@ -356,6 +447,7 @@ const RadioItem = styled.div`
 	display: flex;
 	cursor: pointer;
 	flex-direction: column;
+	background: white;
 
 	&.playing {
 		border: 2px solid red;
@@ -370,6 +462,7 @@ const RadioItemTopLine = styled.div`
 const RadioLogo = styled.img`
 	height: 80px;
 	width: 80px;
+	border: 1px solid grey;
 `;
 
 const MetadataItem = styled.div`

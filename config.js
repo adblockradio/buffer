@@ -4,6 +4,7 @@ var log = require("./log.js")("config");
 var fs = require("fs");
 var { getRadioMetadata } = require("../adblockradio-dl/dl.js");
 var { getAvailable } = require("webradio-metadata");
+var jwt = require("jsonwebtoken");
 
 
 // list of listened radios:
@@ -13,6 +14,17 @@ try {
 	config.radios = JSON.parse(radiosText);
 	var userText = fs.readFileSync("config/user.json");
 	config.user = JSON.parse(userText);
+	if (config.user.token) {
+		var decoded = jwt.decode(config.user.token);
+		if (decoded && decoded.email) {
+			config.user.email = decoded.email;
+		} else {
+			config.user.email = "";
+		}
+	} else {
+		config.user.email = "";
+	}
+
 } catch(e) {
 	return log.error("cannot load config. err=" + e);
 }
@@ -71,6 +83,9 @@ exports.toggleContent = function(country, name, type, enable, callback) {
 	if (enable != "enable" && enable != "disable") {
 		return callback("keywords allowed are 'enable' and 'disable'");
 	}
+	if (["ads", "speech", "music"].indexOf(type) < 0) {
+		return callback("type is either 'ads', 'speech' or 'music'");
+	}
 	for (var i=0; i<config.radios.length; i++) {
 		if (config.radios[i].country == country && config.radios[i].name == name) {
 			config.radios[i].content[type] = (enable == "enable") ? true : false;
@@ -102,11 +117,12 @@ exports.getRadios = function() {
 var getUserConfig = function() {
 	var result = {};
 	Object.assign(result, {
-		token: config.user.token ? true : false,
+		email: config.user.email,
 		cacheLen: config.user.cacheLen,
 		streamInitialBuffer: config.user.streamInitialBuffer,
 		streamGranularity: config.user.streamGranularity,
-		maxRadios: config.user.maxRadios
+		maxRadios: config.user.maxRadios,
+		discardSmallSegments: config.user.discardSmallSegments
 	});
 	return result;
 }

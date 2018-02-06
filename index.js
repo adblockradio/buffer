@@ -101,7 +101,8 @@ var updateDlList = function() {
 	}
 }
 
-if (USE_ABRSDK) {
+if (USE_ABRSDK && config.user.email) {
+	log.info("abrsdk: token detected for email " + config.user.email);
 	abrsdk.connectServer(function(err) {
 		if (err) {
 			log.error("abrsdk: connection error: " + err + ". switch off sdk");
@@ -220,9 +221,12 @@ app.get('/:action/:radio/:delay', function(request, response) {
 				return;
 			}
 
-			var state = { newRequest: true, requestDate: new Date() };
+			var state = { requestDate: new Date() }; //newRequest: true,
+			listenRequestDate = state.requestDate;
+
 			var radioObj = getRadio(radio);
 			var initialBuffer = radioObj.liveStatus.audioCache.readLast(+delay+config.user.streamInitialBuffer,config.user.streamInitialBuffer);
+			//log.debug("listen: readCursor set to " + radioObj.liveStatus.audioCache.readCursor);
 
 			if (!initialBuffer) {
 				log.error("/listen/" + radio + "/" + delay + ": initialBuffer not available");
@@ -246,13 +250,6 @@ app.get('/:action/:radio/:delay', function(request, response) {
 			}
 
 			var listenTimer = setInterval(function() {
-				if (state.newRequest) {
-					listenRequestDate = state.requestDate;
-					state.newRequest = false;
-				} else if (listenRequestDate !== state.requestDate) {
-					log.warn("request canceled because another one has been initiated");
-					return finish();
-				}
 				var willWaitDrain = !response.write("");
 				if (!willWaitDrain) { // detect congestion of stream
 					sendMore();
@@ -271,7 +268,16 @@ app.get('/:action/:radio/:delay', function(request, response) {
 					}, config.user.streamGranularity*1500);
 				}
 			}, 1000*config.user.streamGranularity);
+
 			var sendMore = function() {
+				/*if (state.newRequest) {
+					listenRequestDate = state.requestDate;
+					state.newRequest = false;
+				} else*/
+				if (listenRequestDate !== state.requestDate) {
+					log.warn("request canceled because another one has been initiated");
+					return finish();
+				}
 				var radioObj = getRadio(radio);
 				if (!radioObj) {
 					log.error("/listen/" + radio + "/" + delay + ": radio not available");
@@ -282,7 +288,9 @@ app.get('/:action/:radio/:delay', function(request, response) {
 					log.error("/listen/" + radio + "/" + delay + ": audioCache not available");
 					return finish();
 				}
+				var prevReadCursor = audioCache.readCursor;
 				response.write(audioCache.readAmountAfterCursor(config.user.streamGranularity));
+				//log.debug("listen: readCursor date=" + state.requestDate + " : " + prevReadCursor + " => " + audioCache.readCursor);
 			}
 			break;
 

@@ -268,7 +268,7 @@ class MetaCache extends Writable {
 					for (var key in meta.payload) {
 						if ("" + meta.payload[key] && "" + meta.payload[key] !== "" + this.meta[meta.type][this.meta[meta.type].length-1].payload[key]) {
 							samePayload = false;
-							log.debug("MetaCache: _write: different payload key=" + key + " new=" + meta.payload[key] + " vs old=" + this.meta[meta.type][this.meta[meta.type].length-1].payload[key]);
+							//log.debug("MetaCache: _write: different payload key=" + key + " new=" + meta.payload[key] + " vs old=" + this.meta[meta.type][this.meta[meta.type].length-1].payload[key]);
 							break;
 						}
 					}
@@ -383,7 +383,7 @@ module.exports = function(radio, options) {
 
 				if (options.fetchMetadata) {
 					getMeta(radio.country, radio.name, function(err, parsedMeta, corsEnabled) {
-						if (err) return log.warn("getMeta: error fetching title meta. err=" + err);
+						if (err) return log.warn("getMeta: error fetching title meta for radio " + radio.country + "_" + radio.name + " err=" + err);
 						//log.debug(radio.country + "_" + radio.name + " meta=" + JSON.stringify(parsedMeta));
 						if (options.saveAudio) {
 							if (!dbs.metadata.ended) {
