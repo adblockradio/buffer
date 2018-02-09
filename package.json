@@ -15,7 +15,7 @@
     "jsonwebtoken": "^8.1.1",
     "loglevel": "^1.6.1",
     "loglevel-plugin-prefix": "^0.8.3",
-    "webradio-metadata": "^0.1.7"
+    "webradio-metadata": "^0.1.9"
   },
   "devDependencies": {
     "eslint": "^4.15.0"

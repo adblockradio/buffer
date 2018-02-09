@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "async": "^2.6.0",
     "classnames": "^2.2.5",
     "moment": "^2.20.1",
     "rc-checkbox": "^2.1.4",

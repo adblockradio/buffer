@@ -6,7 +6,6 @@
 var log = require("./log.js")("master");
 var cp = require("child_process");
 var findDataFiles = require("./findDataFiles.js");
-var async = require("async");
 var DlFactory = require("./DlFactory.js");
 var abrsdk = require("adblockradio-sdk")();
 

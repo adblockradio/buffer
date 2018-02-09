@@ -7,8 +7,10 @@ import { load } from './load.js';
 import classNames from 'classnames';
 import Checkbox from 'rc-checkbox';
 import 'rc-checkbox/assets/index.css';
+import FlagContainer from "./Flag.js";
 import defaultCover from "./img/default_radio_logo.svg";
 import userIcon from "./img/user_1085539.svg";
+import removeIcon from "./img/remove_991614.svg";
 
 class Playlist extends Component {
 	constructor(props) {
@@ -18,21 +20,33 @@ class Playlist extends Component {
 		this.componentDidMount = this.componentDidMount.bind(this);
 		this.state = {
 			radiosLoaded: false,
+			radiosError: false,
 			radios: []
+		}
+	}
+
+	translateContentName(type, lang) {
+		switch (type) {
+			case "ads": return { en: "ads", fr: "pubs" }[lang];
+			case "speech": return { en: "speech", fr: "prises de parole" }[lang];
+			default: return "unknown content name";
 		}
 	}
 
 	componentDidMount() {
 		let self = this;
 
-		load("/config/radios/available?t=" + Math.round(Math.random()*1000000), function(res) {
+		load("/config/radios/available?t=" + Math.round(Math.random()*1000000), function(err, res) {
+			if (err) {
+				return self.setState({ radiosLoaded: true, radiosError: true });
+			}
 			try {
 				var radios = JSON.parse(res);
-				self.setState({ radios: radios });
+				self.setState({ radiosLoaded: true, radios: radios });
 			} catch(e) {
 				console.log("problem parsing JSON from server: " + e.message);
+				self.setState({ radiosLoaded: true, radiosError: true });
 			}
-			self.setState({ radiosLoaded: true });
 		});
 	}
 
@@ -50,10 +64,20 @@ class Playlist extends Component {
 	}*/
 
 	render() {
+		var lang = this.props.locale;
 		var self = this;
-		if (!this.state.radiosLoaded) {
+		if (this.state.radiosError) {
 			return (
-				<p>Loading...</p>
+				<SoloMessage>
+					<p>{{en: "Oops, could not get the list of radios.", fr: "Oops, problème pour récupérer la liste des radios." }[lang]}</p>
+					<p>{{en: "Check that the server is running and reload this page", fr: "Vérifiez que le serveur est actif et rechargez cette page" }[lang]}</p>
+				</SoloMessage>
+			);
+		} else if (!this.state.radiosLoaded) {
+			return (
+				<SoloMessage>
+					<p>{{en: "Loading…", fr: "Chargement…" }[lang]}</p>
+				</SoloMessage>
 			);
 		}
 
@@ -65,32 +89,46 @@ class Playlist extends Component {
 
 		return (
 			<PlaylistContainer>
-				<PlaylistSectionTitle>Terms of use</PlaylistSectionTitle>
+				<PlaylistSectionTitle>{{en: "Terms of use", fr: "Conditions d'utilisation" }[lang]}</PlaylistSectionTitle>
 				<PlaylistItem>
 					<TOSContainer>
-						Adblock Radio Buffer. Tous droits réservés, Alexandre Storelli, 2018.<br />
-						Ce site n'a pas vocation à être diffusé au public.<br />
-						Il est mis à disposition pour un usage strictement limité à fins de démonstration.<br />
-						L'écoute est limitée à un seul utilisateur simultané.
+						{{ en: "Adblock Radio Buffer. All rights reserved, Alexandre Storelli, 2018", fr: "Adblock Radio Buffer. Tous droits réservés, Alexandre Storelli, 2018." }[lang]}<br />
+						{{ en: "This website is not intended to be available to the public", fr: "Ce site n'a pas vocation à être diffusé au public." }[lang]}<br />
+						{{ en: "It is provided for demo purposes only", fr: "Il est mis à disposition pour un usage strictement limité à fins de démonstration." }[lang]}"<br />
+						{{ en: "Only one visitor can use it at the same time", fr: "L'écoute est limitée à un seul utilisateur simultané."}[lang]}
 					</TOSContainer>
 					{loggedAs &&
 						<TOSContainer>
 							<LoginIcon src={userIcon} />
-							<span>Connecté à Adblock Radio avec le compte {loggedAs}</span>
+							<span>{{ en: "Connected to Adblock Radio with the account ", fr: "Connecté à Adblock Radio avec le compte " }[lang] + loggedAs}</span>
 						</TOSContainer>
 					}
+					<ChoiceL10nContainer>
+						{["en", "fr"].map(function(lang, index) {
+							return (
+								<FlagContainer country={lang}
+									key={index}
+									selected={self.props.locale === lang}
+									onClick={() => self.props.setLocale(lang)}
+									width={32}
+									height={24} >
+								</FlagContainer>
+							);
+						})}
+					</ChoiceL10nContainer>
 				</PlaylistItem>
 				{!playlistEmpty &&
-					<PlaylistSectionTitle>Your current favorites : click to remove</PlaylistSectionTitle>
+					<PlaylistSectionTitle>{{ en: "Your current favorites", fr: "Vos favoris" }[lang]}</PlaylistSectionTitle>
 				}
 				{current.map(function(radio, i) {
 					return (
 						<PlaylistItem className={classNames({ active: true })} key={"item" + i}>
 							<PlaylistItemTopRow>
-								<PlaylistItemLogo src={radio.favicon || defaultCover} alt="logo" onClick={function() { self.remove(radio.country, radio.name); }} />
+								<PlaylistItemLogo src={radio.favicon || defaultCover} alt="logo" />
 								<PlaylistItemText onClick={function() { self.remove(radio.country, radio.name); }}>
 									{radio.name}
 								</PlaylistItemText>
+								<RemoveIcon src={removeIcon} onClick={function() { self.remove(radio.country, radio.name); }} />
 							</PlaylistItemTopRow>
 							<PlaylistItemConfigContainer>
 								{["ads", "speech"].map(function(type, j) {
@@ -101,7 +139,7 @@ class Playlist extends Component {
 												onChange={(e) => self.props.toggleContent(radio.country, radio.name, type, !e.target.checked, self.componentDidMount)}
 												disabled={!self.props.config.user.email}
 											/>
-											&nbsp; skip {type}
+											&nbsp; {{ en: "skip " + self.translateContentName(type, lang), fr: "zapper les " + self.translateContentName(type, lang) }[lang]}
 										</PlaylistItemConfigItem>
 									)
 								})}
@@ -110,18 +148,21 @@ class Playlist extends Component {
 					)
 				})}
 				{!playlistFull ?
-					<PlaylistSectionTitle>Add radios to your favorites</PlaylistSectionTitle>
+					<PlaylistSectionTitle>{{ en: "Add radios to your favorites", fr: "Ajouter des radios à vos favoris" }[lang]}</PlaylistSectionTitle>
 				:
-				<PlaylistSectionTitle>Your favorites playlist is full. Make room, then click to add</PlaylistSectionTitle>
+				<PlaylistSectionTitle>{{ en: "Your favorites playlist is full. If you want to change it, first make room in it", fr: "Votre playlist est pleine. Si vous souhaitez la modifier, faites-y d'abord de la place" }[lang]}</PlaylistSectionTitle>
 				}
 				{available.map(function(radio, i) {
 					return (
-						<PlaylistItem className={classNames({ active: !playlistFull })} key={"item" + i} onClick={function() { if (!playlistFull) self.insert(radio.country, radio.name); }}>
+						<PlaylistItem className={classNames({ active: !playlistFull })} key={"item" + i}>
 							<PlaylistItemTopRow>
-								<PlaylistItemLogo src={radio.favicon || defaultCover} alt="logo" />
+								<PlaylistItemLogo src={radio.favicon || defaultCover} alt={radio.name} />
 								<PlaylistItemText>
 									{radio.name}
 								</PlaylistItemText>
+								{!playlistFull &&
+									<AddIcon src={removeIcon} onClick={function() { if (!playlistFull) self.insert(radio.country, radio.name); }} />
+								}
 							</PlaylistItemTopRow>
 						</PlaylistItem>
 					)
@@ -134,7 +175,8 @@ class Playlist extends Component {
 Playlist.propTypes = {
 	config: PropTypes.object.isRequired,
 	insertRadio: PropTypes.func.isRequired,
-	removeRadio: PropTypes.func.isRequired
+	removeRadio: PropTypes.func.isRequired,
+	locale: PropTypes.string.isRequired
 };
 
 const PlaylistContainer = styled.div`
@@ -160,6 +202,10 @@ const LoginIcon = styled.img`
 	margin: 0 10px 0 0;
 `;
 
+const ChoiceL10nContainer = styled.div`
+	align-self: center;
+`;
+
 const PlaylistItem = styled.div`
 	border: 2px solid #eee;
 	border-radius: 10px;
@@ -179,7 +225,6 @@ const PlaylistItem = styled.div`
 const PlaylistItemTopRow = styled.div`
 	display: flex;
 	flex-direction: row;
-	margin-bottom: 10px;
 `;
 
 const PlaylistItemText = styled.p`
@@ -188,19 +233,44 @@ const PlaylistItemText = styled.p`
 `;
 
 const PlaylistItemLogo = styled.img`
-	width: 60px;
-	height: 60px;
+	width: 50px;
+	height: 50px;
 	align-self: center;
 	margin-right: 10px;
 	border: 1px solid grey;
 `;
 
+const RemoveIcon = styled.img`
+	width: 32px;
+	height: 32px;
+	align-self: center;
+`;
+
+const AddIcon = styled.img`
+	width: 32px;
+	height: 32px;
+	align-self: center;
+	transform: rotate(45deg);
+`;
+
 const PlaylistItemConfigContainer = styled.div`
 	flex-grow: 1;
+	margin-top: 10px;
 `;
 
 const PlaylistItemConfigItem = styled.label`
 	margin-right: 10px;
+	display: block;
+	margin: 5px 5px 0 5px;
+`;
+
+const SoloMessage = styled.div`
+	align-self: center;
+	margin: auto;
+	padding: 20px 40px;
+	background: white;
+	border: 1px solid grey;
+	border-radius: 20px;
 `;
 
 export default Playlist;

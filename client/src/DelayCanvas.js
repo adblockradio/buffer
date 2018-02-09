@@ -6,7 +6,8 @@ import PropTypes from "prop-types";
 //import classNames from 'classnames';
 
 const colors = {
-	GREY: "rgba(128,128,128,1)",
+	GREY: "rgba(192,192,192,1)",
+	LIGHT_GREY: "rgba(225,225,225,1)",
 	BLUE: "rgb(0, 181, 222)",
 	RED: "rgb(255, 104, 104)",
 	GREEN: "rgb(138, 209, 21)",
@@ -88,22 +89,20 @@ class DelayCanvas extends Component {
 			return ctx.fillRect(0, 0, width, height);
 		}*/
 
-		if (this.props.playing) {
-			var cursorX = this.delayToX(width, this.props.playingDelay);
-			ctx.fillStyle = colors.LIGHT_PINK;
-			ctx.fillRect(0, 0, cursorX, this.props.classList ? 0.4*height : height);
+		var cursorX = this.delayToX(width, this.props.cursor);
+		ctx.fillStyle = this.props.playing ? colors.LIGHT_PINK : colors.LIGHT_GREY;
+		ctx.fillRect(0, 0, cursorX, this.props.classList ? 0.4*height : height);
 
-			ctx.cursor = function(x, y, height, width) {
-				this.fillStyle = colors.PINK;
-				this.beginPath();
-				this.moveTo(x, y);
-				this.lineTo(Math.round(x+width/2), Math.round(y-height));
-				this.lineTo(Math.round(x-width/2), Math.round(y-height));
-				this.fill()
-			}
-
-			ctx.cursor(cursorX, 0.6*height, 0.6*height, 0.3*height);
+		ctx.cursor = function(x, y, height, width, playing) {
+			this.fillStyle = playing ? colors.PINK : colors.GREY;
+			this.beginPath();
+			this.moveTo(x, y);
+			this.lineTo(Math.round(x+width/2), Math.round(y-height));
+			this.lineTo(Math.round(x-width/2), Math.round(y-height));
+			this.fill()
 		}
+
+		ctx.cursor(cursorX, 0.6*height, 0.6*height, 0.6*height, this.props.playing);
 
 		// fill unavailable audio in grey
 		//var startCache = this.getAvailableCache();
@@ -148,13 +147,13 @@ class DelayCanvas extends Component {
 
 	render() {
 		return (
-			<canvas width={this.props.width} height="60px" ref="canvas" id="canvas" style={canvasStyle} />
+			<canvas width={this.props.width} height="30px" ref="canvas" id="canvas" style={canvasStyle} />
 		)
 	}
 }
 
 DelayCanvas.propTypes = {
-	playingDelay: PropTypes.number,
+	cursor: PropTypes.number,
 	availableCache: PropTypes.number,
 	date: PropTypes.object.isRequired,
 	cacheLen: PropTypes.number.isRequired,
@@ -170,7 +169,7 @@ var canvasStyle = {
 	/*position: "absolute",*/
 	/*width: "800px",*/
 	minWidth: "100%",
-	height: "40px",
+	height: "30px",
 	alignSelf: "flex-start",
 	marginTop: "10px"
 }

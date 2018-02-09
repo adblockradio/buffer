@@ -12,6 +12,7 @@ import { play, stop, setVolume } from './audio.js';
 import styled from "styled-components";
 import * as moment from 'moment';
 import classNames from 'classnames';
+import async from 'async';
 
 
 //import iconPlay from "./img/start_1279169.svg";
@@ -26,10 +27,13 @@ class App extends Component {
 		super(props);
 		this.state = {
 			configLoaded: false,
+			configError: false,
 			config: [],
 			playingRadio: null,
+			playingDelay: null,
 			clockDiff: 0,
-			playlistEditMode: false
+			playlistEditMode: false,
+			locale: "fr"
 		}
 		this.play = this.play.bind(this);
 		//this.seekBackward = this.seekBackward.bind(this);
@@ -40,11 +44,12 @@ class App extends Component {
 		this.insertRadio = this.insertRadio.bind(this);
 		this.removeRadio = this.removeRadio.bind(this);
 		this.toggleContent = this.toggleContent.bind(this);
+		this.setLocale = this.setLocale.bind(this);
 	}
 
 	componentDidMount() {
 		this.refreshConfig();
-		this.timerID = setInterval(() => this.tick(), 300);
+		this.timerID = setInterval(() => this.tick(), 400);
 	}
 
 	componentWillUnmount() {
@@ -81,25 +86,67 @@ class App extends Component {
 
 	refreshConfig(callback) {
 		var self = this;
-		load("/config?t=" + Math.round(Math.random()*1000000), function(res) {
+		var onError = function(err) {
+			console.log("problem parsing JSON from server: " + err);
+			self.setState({ configError: true, configLoaded: true });
+		}
+
+		load("/config?t=" + Math.round(Math.random()*1000000), function(err, res) {
+			if (err) return onError(err);
 			try {
 				var config = JSON.parse(res);
-				//console.log(config);
-				self.setState({ config: config }, function() {
+				self.setState({ config: config, configLoaded: true }, function() {
 					self.metadataTimerID = setInterval(self.refreshMetadataContainer, 2000);
 					self.refreshMetadataContainer();
 				});
 			} catch(e) {
-				console.log("problem parsing JSON from server: " + e.message);
+				return onError(e.message);
 			}
-			self.setState({ configLoaded: true });
+
 			if (callback) callback();
 		});
 	}
 
 	tick() {
+		var self = this;
 		this.setState({ date: new Date() }, function() {
-			this.changeChannelIfNeeded();
+			if (!this.state.config || !this.state.config.radios) return;
+			var acceptableContent = new Array(this.state.config.radios.length);
+			async.forEachOf(this.state.config.radios, function(radio, iRadio, onCursorChecked) {
+				var radioName = radio.country + "_" + radio.name;
+				self.checkCursor(radioName, function(res) {
+					//res = { err: ... , delayChanged: ..., hasAcceptableContent: ... }
+					acceptableContent[iRadio] = res.hasAcceptableContent;
+					if (self.state.playingRadio === radioName && res.hasAcceptableContent && res.delayChanged) {
+						// here, we know we are playing a channel with good content at the updated delay
+						self.play(radioName);
+					}
+					onCursorChecked();
+				});
+			}, function(err) {
+				var iPlayingRadio = self.getRadioIndex(self.state.playingRadio);
+				// here, all cursors have been updated
+				//console.log("iPlayingRadio=" + iPlayingRadio + " acceptable=" + acceptableContent[iPlayingRadio]);
+				if (iPlayingRadio < 0 || acceptableContent[iPlayingRadio]) return;
+				// here, we need to change channel.
+				console.log("need to change channel")
+				var listRadiosToTry = [];
+				for (var i=iPlayingRadio + 1; i<acceptableContent.length; i++) {
+					listRadiosToTry.push(i);
+				}
+				for (i=0; i<iPlayingRadio; i++) {
+					listRadiosToTry.push(i);
+				}
+				for (i=0; i<listRadiosToTry.length; i++) {
+					if (acceptableContent[listRadiosToTry[i]]) {
+						var radioObj = self.state.config.radios[listRadiosToTry[i]];
+						return self.play(radioObj.country + "_" + radioObj.name);
+					}
+				}
+				// as a last resort, turn down the volume
+				//if (DEBUG) console.log("no alt content to play, lower volume");
+				setVolume(0.1);
+			});
 		});
 	}
 
@@ -108,30 +155,36 @@ class App extends Component {
 			(this.state.config.radios[iRadio].content.speech || classObj.payload !== "SPEECH"))
 	}
 
-	changeChannelIfNeeded() {
+	checkCursor(radio, callback) {
 		var DEBUG = true;
-		if (!this.state.playingRadio || !this.state.playingDelay) {
+		/*if (!this.state.playingRadio || !this.state.playingDelay) {
 			return; // we are not playing anything
-		}
+		}*/
 
 		var i;
-		var iPlayingRadio = -1;
-		for (i=0; i<this.state.config.radios.length; i++) {
-			var radio = this.state.config.radios[i];
-			if (this.state.playingRadio === radio.country + "_" + radio.name) {
-				iPlayingRadio = i;
-				break;
-			}
+		var stateChange = {};
+
+		var iRadio = this.getRadioIndex(radio);
+		if (iRadio < 0) {
+			if (DEBUG) console.log("radio not found " + radio);
+			return callback({ err: "radio not found", delayChanged: false, hasAcceptableContent: null }); // radio not found
 		}
 
-		var classes = this.state[this.state.playingRadio + "|class"];
+		if (!this.state[radio + "|cursor"]) { // set the default delay
+			stateChange[radio + "|cursor"] = +this.state.date - this.defaultDelay(radio);
+			return this.setState(stateChange, function() {
+				callback({ err: null, delayChanged: true, hasAcceptableContent: true });
+			});
+		}
+
+		var classes = this.state[radio + "|class"];
 		if (!classes) {
-			if (DEBUG) console.log("no classes metadata to use");
-			return; // no classes metadata to use
+			if (DEBUG) console.log("no classes metadata to use for radio " + radio);
+			return callback({ err: "no class metadata", delayChanged: false, hasAcceptableContent: null }); // no classes metadata to use
 		}
 
 		var iCurrentClass = -1;
-		var playingEpoch = +this.state.date - this.state.playingDelay;
+		var playingEpoch = this.state[radio + "|cursor"]; //+this.state.date - this.state[radio + "|cursor"]; //Math.min(, );
 		for (i=classes.length-1; i>=0; i--) {
 			if (classes[i].validFrom <= playingEpoch && (!classes[i].validTo || playingEpoch < classes[i].validTo)) {
 				iCurrentClass = i;
@@ -139,15 +192,16 @@ class App extends Component {
 			}
 		}
 		if (iCurrentClass < 0) {
-			if (DEBUG) console.log("there are no metadata available for the current playing position.");
-			return; // there are no metadata available for the current playing position.
+			if (DEBUG) console.log("there are no metadata available for the given position.");
+			return callback({ err: "no metadata", delayChanged: false, hasAcceptableContent: null }); // there are no metadata available for the current playing position.
 		}
 
-		if (!this.acceptableContent(iPlayingRadio, classes[iCurrentClass])) {
-			// we should change. first try classes at later times, i.e. lower indexes.
+		if (!this.acceptableContent(iRadio, classes[iCurrentClass])) {
+			// that radio has bad content, we move the cursor forward until we find a good content.
+			// we scan classes at later times, i.e. at lower indexes.
 			var iTargetClass = -1;
 			for (i=iCurrentClass; i>=0; i--) {
-				if (this.acceptableContent(iPlayingRadio, classes[i])
+				if (this.acceptableContent(iRadio, classes[i])
 					&& (!classes[i].validTo || classes[i].validTo - classes[i].validFrom > this.state.config.user.discardSmallSegments*1000)) {
 					iTargetClass = i;
 					break;
@@ -156,39 +210,35 @@ class App extends Component {
 
 			if (iTargetClass >= 0) {
 				var delay = +this.state.date - classes[iTargetClass].validFrom;
+				//var delay1 = +this.state.date - this.state[radio + "|lastPlayedDate"];
+				//var delay = Math.max(delay0, delay1);
 				if (DEBUG) console.log("fast forward to delay " + delay);
-				return this.play(this.state.playingRadio, delay);
+				stateChange[radio + "|cursor"] = +this.state.date - delay;
+				return this.setState(stateChange, function() {
+					callback({ err: null, delayChanged: true, hasAcceptableContent: true });
+				});
 			}
 
-			// otherwise, we change channel if possible
-			var listRadiosToTry = [];
-			for (i=iPlayingRadio + 1; i<this.state.config.radios.length; i++) {
-				listRadiosToTry.push(i);
-			}
-			for (i=0; i<iPlayingRadio; i++) {
-				listRadiosToTry.push(i);
-			}
+			// no acceptable audio after
+			stateChange[radio + "|cursor"] = +this.state.date;
+			this.setState(stateChange, function() {
+				callback({ err: null, delayChanged: true, hasAcceptableContent: false });
+			});
 
-			for (i=0; i<listRadiosToTry.length; i++) {
-				var radioObj = this.state.config.radios[listRadiosToTry[i]];
-				var triedRadioName = radioObj.country + "_" + radioObj.name;
-				classes = this.state[triedRadioName + "|class"];
-				if (!classes) continue;
-				for (var j=classes.length-1; j>=0; j--) {
-					if ((!classes[j].validTo || classes[j].validTo > this.defaultDelay(triedRadioName))
-						&& this.acceptableContent(listRadiosToTry[i], classes[j])
-						&& (!classes[j].validTo || classes[j].validTo - classes[j].validFrom > this.state.config.user.discardSmallSegments*1000)) {
-
-						delay = Math.min(+this.state.date - classes[j].validFrom, this.defaultDelay(triedRadioName));
-						if (DEBUG) console.log("hop to " + triedRadioName + " at delay " + delay);
-						return this.play(triedRadioName, delay);
-					}
-				}
-			}
-
-			// as a last resort, turn down the volume
-			if (DEBUG) console.log("no alt content to play, lower volume");
-			setVolume(0.1);
+		} else if (this.state.playingRadio !== radio && this.state[radio + "|cursor"] < +this.state.date - this.state.config.user.cacheLen*1000) {
+			// not played radios must not have their cursor go too far backwards
+			stateChange[radio + "|cursor"] = +this.state.date - this.state.config.user.cacheLen*1000;
+			return this.setState(stateChange, function() {
+				callback({ err: null, delayChanged: true, hasAcceptableContent: true });
+			});
+		} else if (this.state.playingRadio === radio) {
+			// played radio must have a constant delay, so we need to push its cursor regularly
+			stateChange[this.state.playingRadio + "|cursor"] = +this.state.date - this.state.playingDelay;
+			return this.setState(stateChange, function() {
+				callback({ err: null, delayChanged: false, hasAcceptableContent: true });
+			});
+		} else {
+			return callback({ err: null, delayChanged: false, hasAcceptableContent: true });
 		}
 	}
 
@@ -196,13 +246,27 @@ class App extends Component {
 		return Math.min(+this.state[radio + "|available"]*1000, this.state.config.user.cacheLen*1000*2/3);
 	}
 
+	getRadioIndex(radio) {
+		for (var i=0; i<this.state.config.radios.length; i++) {
+			var triedRadioName = this.state.config.radios[i].country + "_" + this.state.config.radios[i].name;
+			if (radio === triedRadioName) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
 	play(radio, delay) {
 		if (radio || delay) {
+			/*if (this.state[radio + "|cursor"] !== delay) {
+				this.moveCursor(radio, delay);
+				if (this.state.playingRadio === radio) return; // stop here, as moveCursor calls Play afterwards
+			}*/
 			//var delay = +new Date() - this.state.clockDiff - (date ? new Date(date) : new Date();
 			//var secondsDelay = Math.round(delay/1000);
 			radio = radio || this.state.playingRadio;
 			if (delay === null || delay === undefined || isNaN(delay)) { // delay == 0 is a valid delay.
-				delay = this.defaultDelay(radio);
+				delay = +this.state.date - this.state[radio + "|cursor"];
 			} else if (delay < 0) {
 				delay = 0;
 			} else if (delay > this.state.config.user.cacheLen*1000) {
@@ -210,13 +274,13 @@ class App extends Component {
 			}
 			delay = Math.round(delay/1000)*1000;
 
-			console.log("Play: radio=" + radio + " delay=" + delay);
-			this.setState({
-				playingRadio: radio,
-				//playingDate: date,
-				playingDelay: delay,
-				playingLive: delay === 0
-			});
+			console.log("Play: radio=" + radio + " delay=" + delay + "ms");
+
+			var stateChange = {};
+			stateChange[radio + "|cursor"] = +this.state.date - delay;
+			stateChange["playingRadio"] = radio;
+			stateChange["playingDelay"] = delay;
+			this.setState(stateChange);
 
 			setVolume(1);
 			play(HOST + "/listen/" + encodeURIComponent(radio) + "/" + (delay/1000) + "?t=" + Math.round(Math.random()*1000000));
@@ -224,9 +288,7 @@ class App extends Component {
 		} else {
 			this.setState({
 				playingRadio: null,
-				//playingDate: null,
-				playingDelay: null,
-				playingLive: null
+				playingDelay: null
 			});
 			//clearInterval(self.metadataTimerID);
 			stop();
@@ -246,6 +308,10 @@ class App extends Component {
 
 	switchPlaylistEditMode() {
 		this.setState({ playlistEditMode: !this.state.playlistEditMode });
+	}
+
+	setLocale(lang) {
+		this.setState({ locale: lang });
 	}
 
 	insertRadio(country, name, callback) {
@@ -271,27 +337,33 @@ class App extends Component {
 
 	render() {
 		let config = this.state.config;
+		let lang = this.state.locale;
 		var self = this;
 		if (!this.state.configLoaded) {
 			return (
-				<div>
-					<div className="RadioItem">
-						<p>Loading…</p>
-					</div>
-				</div>
+				<SoloMessage>
+					<p>{{ en: "Loading…", fr: "Chargement…" }[lang]}</p>
+				</SoloMessage>
 			);
+		} else if (this.state.configError) {
+			return (
+				<SoloMessage>
+					<p>{{ en: "Oops, could not connect to server :(", fr: "Oops, problème de connexion au serveur :(" }[lang]}</p>
+					<p>{{ en: "Restart it then press reload this page", fr: "Redémarrez-le puis rechargez cette page" }[lang]}</p>
+				</SoloMessage>
+			)
 		}
 
 		var statusText;
 		if (self.state.playingRadio) {
-			var delayText = " (direct)";
-			if (!self.state.playingLive) {
+			var delayText = { en: " (live)", fr: " (direct)" }[lang];
+			if (self.state.playingDelay > 0) {
 				var delaySeconds = Math.round(self.state.playingDelay/1000); // + self.state.config.user.streamInitialBuffer);
 				var delayMinutes = Math.floor(delaySeconds / 60);
 				delaySeconds = delaySeconds % 60;
 				var textDelay = (delayMinutes ? delayMinutes + " min" : "");
 				textDelay += (delaySeconds ? ((delaySeconds < 10 && delayMinutes ? " 0" : " ") + delaySeconds + "s") : "");
-				delayText = " (en différé de " + textDelay + ")";
+				delayText = { en: " (" + textDelay + " ago)", fr: " (en différé de " + textDelay + ")" }[lang];
 			}
 			statusText = (
 				<span>
@@ -302,7 +374,7 @@ class App extends Component {
 		} else {
 			statusText = (
 				<span>
-					{"Lancez une radio"}
+					{{ en: "Start a radio", fr: "Lancez une radio" }[lang]}
 				</span>
 			)
 		}
@@ -316,7 +388,7 @@ class App extends Component {
 
 		var buttons = (
 			<StatusButtonsContainer>
-				<PlaybackButton className={classNames({ inactive: !self.state.playlistEditMode })} src={iconList} alt="Edit playlist" onClick={self.switchPlaylistEditMode} />
+				<PlaybackButton className={classNames({ inactive: !self.state.playlistEditMode })} src={iconList} alt={{ en: "Edit playlist", fr: "Changer de liste de radios" }[lang]} onClick={self.switchPlaylistEditMode} />
 				{/*<PlaybackButton className={classNames({ flip: true, inactive: !self.state.playingRadio || self.state.playingDelay >= self.state.config.user.cacheLen*1000 })} src={iconPlay} alt="Backward 30s" onClick={self.seekBackward} />*/}
 				<PlaybackButton className={classNames({ inactive: !self.state.playingRadio })} src={iconStop} alt="Stop" onClick={() => self.play(null, null)} />
 				{/*<PlaybackButton className={classNames({ inactive: !self.state.playingRadio || self.state.playingLive })} src={iconPlay} alt="Forward 30s" onClick={self.seekForward} />*/}
@@ -331,7 +403,9 @@ class App extends Component {
 				<Playlist config={self.state.config}
 					insertRadio={self.insertRadio}
 					removeRadio={self.removeRadio}
-					toggleContent={self.toggleContent} />
+					toggleContent={self.toggleContent}
+					locale={self.state.locale}
+					setLocale={self.setLocale} />
 			);
 		} else {
 			mainContents = (
@@ -344,7 +418,7 @@ class App extends Component {
 
 						var metaList = self.state[radio + "|metadata"];
 						if (metaList) {
-							var targetDate = self.state.date - (playing ? self.state.playingDelay : self.defaultDelay(radio));
+							var targetDate = self.state[radio + "|cursor"];
 							for (let j=0; j<metaList.length; j++) {
 								if (metaList[j].validFrom - 1000 <= targetDate &&
 									(!metaList[j].validTo || (targetDate < +metaList[j].validTo - 1000)))
@@ -361,19 +435,19 @@ class App extends Component {
 								key={"RadioItem" + i}>
 
 								<RadioItemTopLine onClick={function() { self.play(radio); }}>
-									<RadioLogo src={radioObj.favicon} alt="logo" />
+									<RadioLogo src={radioObj.favicon} alt={radio} />
 									{liveMetadata &&
 										<MetadataItem>
 											<MetadataText>
 												{liveMetadata.payload.artist} - {liveMetadata.payload.title}
 											</MetadataText>
-											<MetadataCover src={liveMetadata.payload.cover || defaultCover} alt="logo" />
+											<MetadataCover src={liveMetadata.payload.cover || defaultCover} alt="metadata" />
 										</MetadataItem>
 									}
 								</RadioItemTopLine>
 
 								{metaList &&
-									<DelayCanvas playingDelay={self.state.playingDelay}
+									<DelayCanvas cursor={+self.state.date - self.state[radio + "|cursor"]}
 										availableCache={self.state[radio + "|available"]}
 										classList={self.state[radio + "|class"]}
 										date={new Date(+self.state.date - self.state.clockDiff)}
@@ -418,12 +492,14 @@ class App extends Component {
 }
 
 const AppParent = styled.div`
-	background: #98b3ff;
+	width: 100%;
 `;
 
 const AppView = styled.div`
 	display: flex;
 	height: calc(100% - 60px);
+	max-width: 600px;
+	margin: auto;
 `;
 
 const RadioList = styled.div`
@@ -443,10 +519,8 @@ const RadioItem = styled.div`
 	border-radius: 10px;
 	margin: 10px 10px 0px 10px;
 	padding: 10px 10px 10px 10px;
-	flex-shrink: 0;
-	display: flex;
+	flex-shrink: 1;
 	cursor: pointer;
-	flex-direction: column;
 	background: white;
 
 	&.playing {
@@ -460,8 +534,8 @@ const RadioItemTopLine = styled.div`
 `;
 
 const RadioLogo = styled.img`
-	height: 80px;
-	width: 80px;
+	height: 60px;
+	width: 60px;
 	border: 1px solid grey;
 `;
 
@@ -479,11 +553,12 @@ const MetadataText = styled.p`
 	flex-grow: 1;
 	align-self: center;
 	margin: 10px 0;
-`
+	font-size: 14px;
+`;
 
 const MetadataCover = styled.img`
-	width: 60px;
-	height: 60px;
+	width: 40px;
+	height: 40px;
 	align-self: center;
 	margin-left: 10px;
 `;
@@ -512,7 +587,7 @@ const StatusClock = styled.span`
 `;
 
 const StatusButtonsContainer = styled.span`
-	padding: 10px 0 0 0;
+	padding: 5px 0 0 0;
 	flex-shrink: 0;
 `;
 
@@ -529,6 +604,15 @@ const PlaybackButton = styled.img`
 		filter: opacity(0.25);
 		cursor: unset;
 	}
+`;
+
+const SoloMessage = styled.div`
+	align-self: center;
+	margin: auto;
+	padding: 20px 40px;
+	background: white;
+	border: 1px solid grey;
+	border-radius: 20px;
 `;
 
 export default App;

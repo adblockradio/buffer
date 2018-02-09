@@ -14,11 +14,11 @@ exports.load = function(path, callback) {
 	var xhttp = new XMLHttpRequest();
 	xhttp.onreadystatechange = function() {
 		if (xhttp.readyState === 4 && xhttp.status === 200) {
-			callback(xhttp.responseText); //, xhttp.getResponseHeader("Content-Type"));
+			callback(null, xhttp.responseText); //, xhttp.getResponseHeader("Content-Type"));
 		}
 	};
 	xhttp.onerror = function (e) {
-		console.log("getHeaders: request failed: " + e);
+		callback("getHeaders: request failed: " + e, null);
 	};
 	xhttp.open("GET", HOST + path, true);
 	xhttp.send();
@@ -27,7 +27,10 @@ exports.load = function(path, callback) {
 exports.HOST = HOST;
 
 exports.refreshMetadata = function(radio, callback) {
-	exports.load("/metadata/" + encodeURIComponent(radio) + "/0", function(res) {
+	exports.load("/metadata/" + encodeURIComponent(radio) + "/0", function(err, res) {
+		if (err) {
+			return console.log("refreshMetadata: could not get meta for radio " + radio);
+		}
 		var metadata = [];
 		try {
 			metadata = JSON.parse(res);
@@ -45,7 +48,10 @@ exports.refreshAvailableCache = function(radios, callback) {
 	var stateChange = {};
 	var f = function(i, finished) {
 		if (i >= radios.length) return finished();
-		exports.load("/listen/" + encodeURIComponent(radios[i].country + "_" + radios[i].name) + "/available", function(avRes) {
+		exports.load("/listen/" + encodeURIComponent(radios[i].country + "_" + radios[i].name) + "/available", function(err, avRes) {
+			if (err) {
+				return console.log("refreshAvailableCache: could not load cache data for radio " + radios[i].country + "_" + radios[i].name);
+			}
 			var avResParsed = {};
 			try {
 				avResParsed = JSON.parse(avRes);
