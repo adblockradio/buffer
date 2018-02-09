@@ -93,23 +93,12 @@ class DelayCanvas extends Component {
 		ctx.fillStyle = this.props.playing ? colors.LIGHT_PINK : colors.LIGHT_GREY;
 		ctx.fillRect(0, 0, cursorX, this.props.classList ? 0.4*height : height);
 
-		ctx.cursor = function(x, y, height, width, playing) {
-			this.fillStyle = playing ? colors.PINK : colors.GREY;
-			this.beginPath();
-			this.moveTo(x, y);
-			this.lineTo(Math.round(x+width/2), Math.round(y-height));
-			this.lineTo(Math.round(x-width/2), Math.round(y-height));
-			this.fill()
-		}
-
-		ctx.cursor(cursorX, 0.6*height, 0.6*height, 0.6*height, this.props.playing);
-
 		// fill unavailable audio in grey
 		//var startCache = this.getAvailableCache();
-		if (this.props.availableCache < this.props.cacheLen) {
+		/*if (this.props.availableCache < this.props.cacheLen) {
 			ctx.fillStyle = colors.GREY;
 			ctx.fillRect(0, 0, this.delayToX(width, this.props.availableCache*1000), this.props.classList ? 0.4*height : height);
-		}
+		}*/
 
 		if (this.props.classList) {
 			//var logTxt = "";
@@ -143,6 +132,17 @@ class DelayCanvas extends Component {
 			ctx.line(x,0,x,height);
 		}
 		ctx.stroke();
+
+		ctx.cursor = function(x, y, height, width, playing) {
+			this.fillStyle = playing ? colors.PINK : colors.GREY;
+			this.beginPath();
+			this.moveTo(x, y);
+			this.lineTo(Math.round(x+width/2), Math.round(y-height));
+			this.lineTo(Math.round(x-width/2), Math.round(y-height));
+			this.fill()
+		}
+
+		ctx.cursor(cursorX, 0.6*height, 0.6*height, 0.6*height, this.props.playing);
 	}
 
 	render() {

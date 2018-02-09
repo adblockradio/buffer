@@ -150,7 +150,7 @@ class Playlist extends Component {
 				{!playlistFull ?
 					<PlaylistSectionTitle>{{ en: "Add radios to your favorites", fr: "Ajouter des radios à vos favoris" }[lang]}</PlaylistSectionTitle>
 				:
-				<PlaylistSectionTitle>{{ en: "Your favorites playlist is full. If you want to change it, first make room in it", fr: "Votre playlist est pleine. Si vous souhaitez la modifier, faites-y d'abord de la place" }[lang]}</PlaylistSectionTitle>
+				<PlaylistSectionTitle>{{ en: "Your playlist is full. If you want to change it, first make room in it", fr: "Votre playlist est pleine. Si vous souhaitez la modifier, faites-y d'abord de la place" }[lang]}</PlaylistSectionTitle>
 				}
 				{available.map(function(radio, i) {
 					return (
@@ -181,7 +181,6 @@ Playlist.propTypes = {
 
 const PlaylistContainer = styled.div`
 	flex-grow: 1;
-	overflow-y: scroll;
 	padding-bottom: 60px;
 `;
 

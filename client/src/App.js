@@ -225,9 +225,9 @@ class App extends Component {
 				callback({ err: null, delayChanged: true, hasAcceptableContent: false });
 			});
 
-		} else if (this.state.playingRadio !== radio && this.state[radio + "|cursor"] < +this.state.date - this.state.config.user.cacheLen*1000) {
+		} else if (this.state.playingRadio !== radio && this.state[radio + "|cursor"] < +this.state.date - this.state.config.user.cacheLen*2/3*1000) {
 			// not played radios must not have their cursor go too far backwards
-			stateChange[radio + "|cursor"] = +this.state.date - this.state.config.user.cacheLen*1000;
+			stateChange[radio + "|cursor"] = +this.state.date - this.state.config.user.cacheLen*2/3*1000;
 			return this.setState(stateChange, function() {
 				callback({ err: null, delayChanged: true, hasAcceptableContent: true });
 			});
@@ -269,10 +269,10 @@ class App extends Component {
 				delay = +this.state.date - this.state[radio + "|cursor"];
 			} else if (delay < 0) {
 				delay = 0;
-			} else if (delay > this.state.config.user.cacheLen*1000) {
-				delay = this.state.config.user.cacheLen*1000;
+			} else if (delay > Math.min(this.state.config.user.cacheLen*1000, +this.state[radio + "|available"]*1000)) {
+				delay = Math.min(this.state.config.user.cacheLen*1000, +this.state[radio + "|available"]*1000);
 			}
-			delay = Math.round(delay/1000)*1000;
+			delay = Math.round(delay/1000)*1000; // rounded seconds
 
 			console.log("Play: radio=" + radio + " delay=" + delay + "ms");
 
@@ -524,7 +524,7 @@ const RadioItem = styled.div`
 	background: white;
 
 	&.playing {
-		border: 2px solid red;
+		border: 2px solid #ef66b0;
 	}
 `;
 
