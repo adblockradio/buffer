@@ -288,7 +288,7 @@ class App extends Component {
 
 			setVolume(1);
 			document.title = radio.split("_")[1] + " - Adblock Radio Buffer";
-			var url = HOST + "/listen/" + encodeURIComponent(radio) + "/" + (delay/1000) + "?t=" + Math.round(Math.random()*1000000);
+			var url = HOST + "/listen/" + encodeURIComponent(radio) + "/" + (delay/1000) + "?t=" + Math.round(Math.random()*1000000000);
 			play(url, function(err) {
 				if (err) console.log("Play: error=" + err);
 				if (callback) callback(err);
@@ -301,7 +301,7 @@ class App extends Component {
 			});
 			document.title = "Adblock Radio Buffer";
 			stop();
-			callback(null);
+			if (callback) callback(null);
 		}
 	}
 

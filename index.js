@@ -200,6 +200,15 @@ var getRadio = function(country, name) {
 
 var listenRequestDate = null;
 
+// /!\ this is a HACK. Chrome mobile sends two requests to listen to a radio.
+// the first one is tied to the audio output. the second one is useless.
+// this is probably a bug in Chrome mobile.
+// this is bad because the code closes the first connection, then
+// serve the second. As a result, playback stops on the client after the buffer.
+// we do a workaround for this bug by rejecting two consecutive listen requests
+// that share the same random query string, originally used to avoid cache issues
+var lastQueryRandomNum = null;
+
 app.get('/:action/:radio/:delay', function(request, response) {
 	var action = request.params.action;
 	var radio = decodeURIComponent(request.params.radio);
@@ -221,7 +230,14 @@ app.get('/:action/:radio/:delay', function(request, response) {
 			}
 
 			var state = { requestDate: new Date() }; //newRequest: true,
+			var queryRandomNum = request.query.t;
+			if (lastQueryRandomNum !== null && queryRandomNum == lastQueryRandomNum) {
+				log.warn("listen: discarding second listen request with same query string");
+				response.writeHead(400);
+				return response.end("query string must change at every request");
+			}
 			listenRequestDate = state.requestDate;
+			lastQueryRandomNum = queryRandomNum;
 
 			var radioObj = getRadio(radio);
 			var initialBuffer = radioObj.liveStatus.audioCache.readLast(+delay+config.user.streamInitialBuffer,config.user.streamInitialBuffer);
