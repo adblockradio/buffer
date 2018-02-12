@@ -97,7 +97,7 @@ class Playlist extends Component {
 					<ul>
 						{["music", "speech", "ads"].map(function(type, index) {
 							return (
-								<ColorItem>
+								<ColorItem key={"type" + index}>
 									<ColorDot style={{backgroundColor: colorByType(type)}} alt={self.translateContentName(type, lang)}></ColorDot>
 									<ColorLabel>{self.translateContentName(type, lang)}</ColorLabel>
 								</ColorItem>

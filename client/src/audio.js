@@ -11,7 +11,7 @@ audioElement.addEventListener("play", function() {
 	console.log("playback started");
 });
 
-var play = function(url) {
+/*var play = function(url) {
 	stop();
 	console.log("play " + url);
 	audioElement.src = url;
@@ -27,6 +27,25 @@ var stop = function() {
 	} catch(e) {
 		// no-op
 	}
+}*/
+
+var play = function(url, callback) { // https://developers.google.com/web/updates/2017/06/play-request-was-interrupted
+	console.log("play " + url);
+	audioElement.src = url;
+	var playPromise = audioElement.play();
+	if (playPromise !== undefined) {
+		playPromise.then(_ => {
+			if (callback) callback(null);
+		})
+		.catch(error => {
+			if (callback) callback(error);
+		});
+	}
+}
+
+var stop = function() {
+	audioElement.src = "";
+	audioElement.load();
 }
 
 var setVolume = function(volume) {

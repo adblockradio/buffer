@@ -120,9 +120,12 @@ class App extends Component {
 					acceptableContent[iRadio] = res.hasAcceptableContent;
 					if (self.state.playingRadio === radioName && res.hasAcceptableContent && res.delayChanged) {
 						// here, we know we are playing a channel with good content at the updated delay
-						self.play(radioName);
+						self.play(radioName, null, function(err) {
+							onCursorChecked();
+						});
+					} else {
+						onCursorChecked();
 					}
-					onCursorChecked();
 				});
 			}, function(err) {
 				var iPlayingRadio = self.getRadioIndex(self.state.playingRadio);
@@ -141,7 +144,7 @@ class App extends Component {
 				for (i=0; i<listRadiosToTry.length; i++) {
 					if (acceptableContent[listRadiosToTry[i]]) {
 						var radioObj = self.state.config.radios[listRadiosToTry[i]];
-						return self.play(radioObj.country + "_" + radioObj.name);
+						return self.play(radioObj.country + "_" + radioObj.name, null, null);
 					}
 				}
 				// as a last resort, turn down the volume
@@ -157,7 +160,7 @@ class App extends Component {
 	}
 
 	checkCursor(radio, callback) {
-		var DEBUG = true;
+		var DEBUG = false;
 		/*if (!this.state.playingRadio || !this.state.playingDelay) {
 			return; // we are not playing anything
 		}*/
@@ -244,7 +247,13 @@ class App extends Component {
 	}
 
 	defaultDelay(radio) {
-		return Math.min(+this.state[radio + "|available"]*1000, this.state.config.user.cacheLen*1000*2/3);
+		var classes = this.state[radio + "|class"];
+		if (!classes) {
+			return Math.min(+this.state[radio + "|available"]*1000, this.state.config.user.cacheLen*1000*2/3);
+		} else {
+			var firstMetaDate = classes[classes.length-1].validFrom;
+			return Math.min(+this.state.date-firstMetaDate, this.state.config.user.cacheLen*1000*2/3);
+		}
 	}
 
 	getRadioIndex(radio) {
@@ -257,14 +266,8 @@ class App extends Component {
 		return -1;
 	}
 
-	play(radio, delay) {
+	play(radio, delay, callback) {
 		if (radio || delay) {
-			/*if (this.state[radio + "|cursor"] !== delay) {
-				this.moveCursor(radio, delay);
-				if (this.state.playingRadio === radio) return; // stop here, as moveCursor calls Play afterwards
-			}*/
-			//var delay = +new Date() - this.state.clockDiff - (date ? new Date(date) : new Date();
-			//var secondsDelay = Math.round(delay/1000);
 			radio = radio || this.state.playingRadio;
 			if (delay === null || delay === undefined || isNaN(delay)) { // delay == 0 is a valid delay.
 				delay = +this.state.date - this.state[radio + "|cursor"];
@@ -284,16 +287,21 @@ class App extends Component {
 			this.setState(stateChange);
 
 			setVolume(1);
-			play(HOST + "/listen/" + encodeURIComponent(radio) + "/" + (delay/1000) + "?t=" + Math.round(Math.random()*1000000));
-			document.title = radio.split("_")[1] + " - Adblock Radio";
+			document.title = radio.split("_")[1] + " - Adblock Radio Buffer";
+			var url = HOST + "/listen/" + encodeURIComponent(radio) + "/" + (delay/1000) + "?t=" + Math.round(Math.random()*1000000);
+			play(url, function(err) {
+				if (err) console.log("Play: error=" + err);
+				if (callback) callback(err);
+			});
+
 		} else {
 			this.setState({
 				playingRadio: null,
 				playingDelay: null
 			});
-			//clearInterval(self.metadataTimerID);
+			document.title = "Adblock Radio Buffer";
 			stop();
-			document.title = "Adblock Radio";
+			callback(null);
 		}
 	}
 
@@ -391,7 +399,7 @@ class App extends Component {
 			<StatusButtonsContainer>
 				<PlaybackButton className={classNames({ inactive: !self.state.playlistEditMode })} src={iconList} alt={{ en: "Edit playlist", fr: "Changer de liste de radios" }[lang]} onClick={self.switchPlaylistEditMode} />
 				{/*<PlaybackButton className={classNames({ flip: true, inactive: !self.state.playingRadio || self.state.playingDelay >= self.state.config.user.cacheLen*1000 })} src={iconPlay} alt="Backward 30s" onClick={self.seekBackward} />*/}
-				<PlaybackButton className={classNames({ inactive: !self.state.playingRadio })} src={iconStop} alt="Stop" onClick={() => self.play(null, null)} />
+				<PlaybackButton className={classNames({ inactive: !self.state.playingRadio })} src={iconStop} alt="Stop" onClick={() => self.play(null, null, null)} />
 				{/*<PlaybackButton className={classNames({ inactive: !self.state.playingRadio || self.state.playingLive })} src={iconPlay} alt="Forward 30s" onClick={self.seekForward} />*/}
 			</StatusButtonsContainer>
 		);
@@ -435,7 +443,7 @@ class App extends Component {
 								id={"RadioItem" + i}
 								key={"RadioItem" + i}>
 
-								<RadioItemTopLine onClick={function() { self.play(radio); }}>
+								<RadioItemTopLine onClick={function() { self.play(radio, null, null); }}>
 									<RadioLogo src={radioObj.favicon} alt={radio} />
 									{liveMetadata &&
 										<MetadataItem>
@@ -457,7 +465,7 @@ class App extends Component {
 										playing={playing}
 										cacheLen={self.state.config.user.cacheLen}
 										width={self.state.canvasWidth || 100}
-										playCallback={function(delay) { self.play(radio, delay); }} />
+										playCallback={function(delay) { self.play(radio, delay, null); }} />
 								}
 
 							</RadioItem>
