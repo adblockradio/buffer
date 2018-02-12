@@ -233,7 +233,7 @@ app.get('/:action/:radio/:delay', function(request, response) {
 				return response.end("buffer not available");
 			}
 
-			log.info("listen: send initial buffer of " + initialBuffer.length + " bytes");
+			log.info("listen: send initial buffer of " + initialBuffer.length + " bytes to " + getIPExpress(request));
 
 			switch(radioObj.codec) {
 				case "AAC": response.set('Content-Type', 'audio/aacp'); break;
@@ -317,3 +317,16 @@ app.get('/:action/:radio/:delay', function(request, response) {
 			response.end("unknown route");
 	}
 });
+
+
+var getIPExpress = function(request) {
+	var ip = request.headers['x-forwarded-for']; // standard proxy header
+	if (!ip) ip = request.headers['x-real-ip']; // nginx proxy header
+	if (!ip) ip = request.connection.remoteAddress;
+	return ip;
+}
+
+var getDeviceInfoExpress = function(request) {
+    var agent = request.headers['user-agent'];
+    return "login from IP " + exports.getIPExpress(request) + " and UA " + agent;
+}
