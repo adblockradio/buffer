@@ -11,6 +11,7 @@ import FlagContainer from "./Flag.js";
 import defaultCover from "./img/default_radio_logo.svg";
 import userIcon from "./img/user_1085539.svg";
 import removeIcon from "./img/remove_991614.svg";
+import { colors, colorByType } from "./colors.js";
 
 class Playlist extends Component {
 	constructor(props) {
@@ -29,6 +30,7 @@ class Playlist extends Component {
 		switch (type) {
 			case "ads": return { en: "ads", fr: "pubs" }[lang];
 			case "speech": return { en: "speech", fr: "prises de parole" }[lang];
+			case "music": return { en: "music", fr: "musique" }[lang];
 			default: return "unknown content name";
 		}
 	}
@@ -89,19 +91,26 @@ class Playlist extends Component {
 
 		return (
 			<PlaylistContainer>
-				<PlaylistSectionTitle>{{en: "Terms of use", fr: "Conditions d'utilisation" }[lang]}</PlaylistSectionTitle>
+				<PlaylistSectionTitle>{{en: "Automatically skip ads and chit-chat", fr: "Zappez automatiquement la pub et le bla-bla" }[lang]}</PlaylistSectionTitle>
 				<PlaylistItem>
-					<TOSContainer>
-						{{ en: "Adblock Radio Buffer. All rights reserved, Alexandre Storelli, 2018", fr: "Adblock Radio Buffer. Tous droits réservés, Alexandre Storelli, 2018." }[lang]}<br />
-						{{ en: "This website is not intended to be available to the public", fr: "Ce site n'a pas vocation à être diffusé au public." }[lang]}<br />
-						{{ en: "It is provided for demo purposes only", fr: "Il est mis à disposition pour un usage strictement limité à fins de démonstration." }[lang]}"<br />
-						{{ en: "Only one visitor can use it at the same time", fr: "L'écoute est limitée à un seul utilisateur simultané."}[lang]}
-					</TOSContainer>
+					<span>{{ en: "With Adblock Radio, get live info about what is being broadcast:", fr: "Adblock Radio vous indique en direct ce qui passe à la radio:" }[lang]}</span>
+					<ul>
+						{["music", "speech", "ads"].map(function(type, index) {
+							return (
+								<ColorItem>
+									<ColorDot style={{backgroundColor: colorByType(type)}} alt={self.translateContentName(type, lang)}></ColorDot>
+									<ColorLabel>{self.translateContentName(type, lang)}</ColorLabel>
+								</ColorItem>
+							);
+						})}
+					</ul>
+					<span>{{ en: "For each radio in your playlist, you can automatically skip ads and/or chit-chat", fr: "Pour chacune des radios de votre playlist, vous pouvez passer automatiquement les pubs et/ou les prises de parole."}[lang]}</span>
+
 					{loggedAs &&
-						<TOSContainer>
+						<ProfileContainer>
 							<LoginIcon src={userIcon} />
-							<span>{{ en: "Connected to Adblock Radio with the account ", fr: "Connecté à Adblock Radio avec le compte " }[lang] + loggedAs}</span>
-						</TOSContainer>
+							<span>{loggedAs}</span> {/*{{ en: "Connected to Adblock Radio with the account ", fr: "Connecté à Adblock Radio avec le compte " }[lang] + */}
+						</ProfileContainer>
 					}
 					<ChoiceL10nContainer>
 						{["en", "fr"].map(function(lang, index) {
@@ -154,19 +163,28 @@ class Playlist extends Component {
 				}
 				{available.map(function(radio, i) {
 					return (
-						<PlaylistItem className={classNames({ active: !playlistFull })} key={"item" + i}>
+						<PlaylistItem className={classNames({ active: !playlistFull })} key={"item" + i} onClick={function() { if (!playlistFull) self.insert(radio.country, radio.name); }}>
 							<PlaylistItemTopRow>
 								<PlaylistItemLogo src={radio.favicon || defaultCover} alt={radio.name} />
 								<PlaylistItemText>
 									{radio.name}
 								</PlaylistItemText>
 								{!playlistFull &&
-									<AddIcon src={removeIcon} onClick={function() { if (!playlistFull) self.insert(radio.country, radio.name); }} />
+									<AddIcon src={removeIcon} />
 								}
 							</PlaylistItemTopRow>
 						</PlaylistItem>
 					)
 				})}
+				<PlaylistSectionTitle>{{en: "Terms of use", fr: "Conditions d'utilisation" }[lang]}</PlaylistSectionTitle>
+				<PlaylistItem>
+					<TOSContainer>
+						{{ en: "Adblock Radio Buffer. All rights reserved, Alexandre Storelli, 2018", fr: "Adblock Radio Buffer. Tous droits réservés, Alexandre Storelli, 2018." }[lang]}<br />
+						{{ en: "This website is not intended to be available to the public", fr: "Ce site n'a pas vocation à être diffusé au public." }[lang]}<br />
+						{{ en: "It is provided for demo purposes only", fr: "Il est mis à disposition pour un usage strictement limité à fins de démonstration." }[lang]}<br />
+						{{ en: "Only one visitor can use it at the same time", fr: "L'écoute est limitée à un seul utilisateur simultané."}[lang]}
+					</TOSContainer>
+				</PlaylistItem>
 			</PlaylistContainer>
 		)
 	}
@@ -193,6 +211,27 @@ const TOSContainer = styled.p`
 	margin: 10px;
 	text-align: center;
 	font-size: 12px;
+`;
+
+const ColorItem = styled.li`
+	display: flex;
+	margin-bottom: 3px;
+`;
+
+const ColorDot = styled.span`
+	width: 18px;
+	height: 18px;
+	border-radius: 9px;
+`;
+
+const ColorLabel = styled.span`
+	align-self: center;
+	margin-left: 10px;
+`;
+
+const ProfileContainer = styled.div`
+	text-align: center;
+	margin: 10px;
 `;
 
 const LoginIcon = styled.img`
@@ -265,7 +304,7 @@ const PlaylistItemConfigItem = styled.label`
 
 const SoloMessage = styled.div`
 	align-self: center;
-	margin: auto;
+	margin: 50px auto;
 	padding: 20px 40px;
 	background: white;
 	border: 1px solid grey;

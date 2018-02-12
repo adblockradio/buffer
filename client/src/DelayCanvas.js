@@ -4,17 +4,7 @@ import React, { Component } from "react";
 import PropTypes from "prop-types";
 //import styled from "styled-components";
 //import classNames from 'classnames';
-
-const colors = {
-	GREY: "rgba(192,192,192,1)",
-	LIGHT_GREY: "rgba(225,225,225,1)",
-	BLUE: "rgb(0, 181, 222)",
-	RED: "rgb(255, 104, 104)",
-	GREEN: "rgb(138, 209, 21)",
-	YELLOW: "rgba(128,128,0,1)",
-	PINK: "rgb(239, 102, 176)", /*#ef66b0*/
-	LIGHT_PINK: "rgba(239, 102, 176, 0.5)"
-}
+import { colors } from "./colors.js";
 
 const TICKS_INTERVAL = 60000;
 
@@ -147,7 +137,7 @@ class DelayCanvas extends Component {
 
 	render() {
 		return (
-			<canvas width={this.props.width} height="30px" ref="canvas" id="canvas" style={canvasStyle} />
+			<canvas width={this.props.width} height="24px" ref="canvas" id="canvas" style={canvasStyle} />
 		)
 	}
 }
@@ -169,7 +159,7 @@ var canvasStyle = {
 	/*position: "absolute",*/
 	/*width: "800px",*/
 	minWidth: "100%",
-	height: "30px",
+	height: "24px",
 	alignSelf: "flex-start",
 	marginTop: "10px"
 }

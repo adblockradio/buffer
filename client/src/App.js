@@ -363,19 +363,19 @@ class App extends Component {
 				delaySeconds = delaySeconds % 60;
 				var textDelay = (delayMinutes ? delayMinutes + " min" : "");
 				textDelay += (delaySeconds ? ((delaySeconds < 10 && delayMinutes ? " 0" : " ") + delaySeconds + "s") : "");
-				delayText = { en: " (" + textDelay + " ago)", fr: " (en différé de " + textDelay + ")" }[lang];
+				delayText = { en: " (" + textDelay + " ago)", fr: " (différé de " + textDelay + ")" }[lang];
 			}
 			statusText = (
-				<span>
+				<StatusText>
 					{self.state.playingRadio.split("_")[1]}
 					{delayText}
-				</span>
+				</StatusText>
 			)
 		} else {
 			statusText = (
-				<span>
+				<StatusText>
 					{{ en: "Start a radio", fr: "Lancez une radio" }[lang]}
-				</span>
+				</StatusText>
 			)
 		}
 
@@ -441,7 +441,9 @@ class App extends Component {
 											<MetadataText>
 												{liveMetadata.payload.artist} - {liveMetadata.payload.title}
 											</MetadataText>
-											<MetadataCover src={liveMetadata.payload.cover || defaultCover} alt="metadata" />
+											{liveMetadata.payload.cover &&
+												<MetadataCover src={liveMetadata.payload.cover || defaultCover} alt="metadata" />
+											}
 										</MetadataItem>
 									}
 								</RadioItemTopLine>
@@ -518,8 +520,8 @@ const RadioItem = styled.div`
 	border: 2px solid grey;
 	border-radius: 10px;
 	margin: 10px 10px 0px 10px;
-	padding: 10px 10px 10px 10px;
-	flex-shrink: 1;
+	padding: 10px 10px 6px 10px;
+	width: calc(100% - 44px);
 	cursor: pointer;
 	background: white;
 
@@ -541,7 +543,8 @@ const RadioLogo = styled.img`
 
 const MetadataItem = styled.div`
 	flex-grow: 1;
-	margin: 0 0 0 15px;
+	margin: 0 0 0 10px;
+	border-radius: 5px;
 	padding: 0 10px;
 	flex-shrink: 1;
 	background: #eee;
@@ -553,7 +556,7 @@ const MetadataText = styled.p`
 	flex-grow: 1;
 	align-self: center;
 	margin: 10px 0;
-	font-size: 14px;
+	font-size: 13px;
 `;
 
 const MetadataCover = styled.img`
@@ -586,14 +589,17 @@ const StatusClock = styled.span`
 	font-weight: bold;
 `;
 
+const StatusText = styled.span`
+`;
+
 const StatusButtonsContainer = styled.span`
 	padding: 5px 0 0 0;
 	flex-shrink: 0;
 `;
 
 const PlaybackButton = styled.img`
-	height: 40px;
-	margin-right: 10px;
+	height: 35px;
+	margin-right: 7px;
 	cursor: pointer;
 	margin-top: 0px;
 
@@ -608,7 +614,7 @@ const PlaybackButton = styled.img`
 
 const SoloMessage = styled.div`
 	align-self: center;
-	margin: auto;
+	margin: 50px auto;
 	padding: 20px 40px;
 	background: white;
 	border: 1px solid grey;
