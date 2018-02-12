@@ -247,13 +247,13 @@ class App extends Component {
 	}
 
 	defaultDelay(radio) {
+		var delays = [+this.state[radio + "|available"]*1000, this.state.config.user.cacheLen*1000*2/3];
 		var classes = this.state[radio + "|class"];
-		if (!classes) {
-			return Math.min(+this.state[radio + "|available"]*1000, this.state.config.user.cacheLen*1000*2/3);
-		} else {
+		if (classes) {
 			var firstMetaDate = classes[classes.length-1].validFrom;
-			return Math.min(+this.state.date-firstMetaDate, this.state.config.user.cacheLen*1000*2/3);
+			delays.push(+this.state.date-firstMetaDate);
 		}
+		return Math.min(...delays);
 	}
 
 	getRadioIndex(radio) {
