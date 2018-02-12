@@ -11,7 +11,7 @@ import FlagContainer from "./Flag.js";
 import defaultCover from "./img/default_radio_logo.svg";
 import userIcon from "./img/user_1085539.svg";
 import removeIcon from "./img/remove_991614.svg";
-import { colors, colorByType } from "./colors.js";
+import { colorByType } from "./colors.js";
 
 class Playlist extends Component {
 	constructor(props) {
@@ -127,7 +127,7 @@ class Playlist extends Component {
 					</ChoiceL10nContainer>
 				</PlaylistItem>
 				{!playlistEmpty &&
-					<PlaylistSectionTitle>{{ en: "Your current favorites", fr: "Vos favoris" }[lang]}</PlaylistSectionTitle>
+					<PlaylistSectionTitle>{{ en: "Your playlist", fr: "Votre playlist" }[lang]}</PlaylistSectionTitle>
 				}
 				{current.map(function(radio, i) {
 					return (
@@ -157,7 +157,7 @@ class Playlist extends Component {
 					)
 				})}
 				{!playlistFull ?
-					<PlaylistSectionTitle>{{ en: "Add radios to your favorites", fr: "Ajouter des radios à vos favoris" }[lang]}</PlaylistSectionTitle>
+					<PlaylistSectionTitle>{{ en: "Add radios to your playlist", fr: "Ajouter des radios à votre playlist" }[lang]}</PlaylistSectionTitle>
 				:
 				<PlaylistSectionTitle>{{ en: "Your playlist is full. If you want to change it, first make room in it", fr: "Votre playlist est pleine. Si vous souhaitez la modifier, faites-y d'abord de la place" }[lang]}</PlaylistSectionTitle>
 				}

@@ -10,7 +10,7 @@ import Playlist from './Playlist.js';
 import { load, refreshMetadata, refreshAvailableCache, HOST } from './load.js';
 import { play, stop, setVolume } from './audio.js';
 import styled from "styled-components";
-import * as moment from 'moment';
+/*import * as moment from 'moment';*/
 import classNames from 'classnames';
 import async from 'async';
 
@@ -20,6 +20,7 @@ import iconStop from "./img/stop_1279170.svg";
 import iconList from "./img/list_241386.svg";
 //import iconNext from "./img/next_607554.svg";
 import defaultCover from "./img/default_radio_logo.svg";
+import playing from "./img/playing.gif";
 
 
 class App extends Component {
@@ -356,33 +357,33 @@ class App extends Component {
 
 		var statusText;
 		if (self.state.playingRadio) {
-			var delayText = { en: " (live)", fr: " (direct)" }[lang];
+			var delayText = { en: "Live", fr: "En direct" }[lang];
 			if (self.state.playingDelay > 0) {
 				var delaySeconds = Math.round(self.state.playingDelay/1000); // + self.state.config.user.streamInitialBuffer);
 				var delayMinutes = Math.floor(delaySeconds / 60);
 				delaySeconds = delaySeconds % 60;
 				var textDelay = (delayMinutes ? delayMinutes + " min" : "");
 				textDelay += (delaySeconds ? ((delaySeconds < 10 && delayMinutes ? " 0" : " ") + delaySeconds + "s") : "");
-				delayText = { en: " (" + textDelay + " ago)", fr: " (différé de " + textDelay + ")" }[lang];
+				delayText = { en: textDelay + " ago", fr: "Différé de " + textDelay }[lang];
 			}
 			statusText = (
-				<StatusText>
-					{self.state.playingRadio.split("_")[1]}
-					{delayText}
-				</StatusText>
+				<span>
+					{self.state.playingRadio.split("_")[1]}<br />
+					<DelayText>{delayText}</DelayText>
+				</span>
 			)
 		} else {
 			statusText = (
-				<StatusText>
+				<span>
 					{{ en: "Start a radio", fr: "Lancez une radio" }[lang]}
-				</StatusText>
+				</span>
 			)
 		}
 
 		var status = (
 			<StatusTextContainer>
-				<StatusClock>{moment(self.state.date).format("HH:mm")}</StatusClock>
-				&nbsp;–&nbsp;{statusText}
+				{/*<StatusClock>{moment(self.state.date).format("HH:mm")}</StatusClock>&nbsp;–&nbsp;*/}
+				{statusText}
 			</StatusTextContainer>
 		);
 
@@ -473,6 +474,9 @@ class App extends Component {
 					{mainContents}
 				</AppView>
 				<Controls>
+					{self.state.playingRadio &&
+						<PlayingGif src={playing} />
+					}
 					{status}
 					{buttons}
 					{/*metaList={self.state[self.state.playingRadio + "|metadata"]}*/}
@@ -543,8 +547,7 @@ const RadioLogo = styled.img`
 
 const MetadataItem = styled.div`
 	flex-grow: 1;
-	margin: 0 0 0 10px;
-	border-radius: 5px;
+	border-radius: 0 5px 5px 0;
 	padding: 0 10px;
 	flex-shrink: 1;
 	background: #eee;
@@ -566,6 +569,12 @@ const MetadataCover = styled.img`
 	margin-left: 10px;
 `;
 
+const PlayingGif = styled.img`
+	align-self: center;
+	height: 40px;
+	width: 40px;
+	margin: 0 -10px 0 10px;
+`;
 
 const Controls = styled.div`
 	z-index: 1000;
@@ -581,15 +590,17 @@ const Controls = styled.div`
 `;
 
 const StatusTextContainer = styled.span`
-	padding: 0px 20px 0 20px;
+	padding: 0px 10px 0 20px;
 	flex-shrink: 1;
+	flex-grow: 1;
 `;
 
-const StatusClock = styled.span`
+/*const StatusClock = styled.span`
 	font-weight: bold;
-`;
+`;*/
 
-const StatusText = styled.span`
+const DelayText = styled.span`
+	font-size: 12px;
 `;
 
 const StatusButtonsContainer = styled.span`
