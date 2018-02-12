@@ -233,7 +233,7 @@ app.get('/:action/:radio/:delay', function(request, response) {
 				return response.end("buffer not available");
 			}
 
-			log.info("listen: send initial buffer of " + initialBuffer.length + " bytes to " + getIPExpress(request));
+			log.info("listen: send initial buffer of " + initialBuffer.length + " bytes (" + getDeviceInfoExpress(request) + ")");
 
 			switch(radioObj.codec) {
 				case "AAC": response.set('Content-Type', 'audio/aacp'); break;
@@ -328,5 +328,5 @@ var getIPExpress = function(request) {
 
 var getDeviceInfoExpress = function(request) {
     var agent = request.headers['user-agent'];
-    return "login from IP " + exports.getIPExpress(request) + " and UA " + agent;
+    return "login from IP " + getIPExpress(request) + " and UA " + agent;
 }
