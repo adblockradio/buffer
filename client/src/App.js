@@ -342,6 +342,7 @@ class App extends Component {
 	}
 
 	removeRadio(country, name, callback) {
+		if (this.state.playingRadio === country + "_" + name) this.play(null, null, function() {});
 		var self = this;
 		load("/config/radios/remove/" + encodeURIComponent(country) + "/" + encodeURIComponent(name) + "?t=" + Math.round(Math.random()*1000000), function(res) {
 			self.refreshConfig(callback);

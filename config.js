@@ -52,14 +52,17 @@ exports.insertRadio = function(country, name, callback) {
 			return callback("Radio is not recognized");
 		} else {
 			config.radios.push({
-				"country": country,
-				"name": name,
-				"content": {
-					"ads": false,
-					"speech": true,
-					"music": true
+				country: country,
+				name: name,
+				content: {
+					ads: false,
+					speech: true,
+					music: true
 				},
-				"enable": true
+				url: radio.url,
+				codec: radio.codec,
+				favicon: radio.favicon,
+				enable: true
 			});
 			saveRadios();
 			return callback(null);
