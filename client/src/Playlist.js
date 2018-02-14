@@ -91,41 +91,6 @@ class Playlist extends Component {
 
 		return (
 			<PlaylistContainer>
-				<PlaylistSectionTitle>{{en: "Automatically skip ads and chit-chat", fr: "Zappez automatiquement la pub et le bla-bla" }[lang]}</PlaylistSectionTitle>
-				<PlaylistItem>
-					<span>{{ en: "With Adblock Radio, get live info about what is being broadcast:", fr: "Adblock Radio vous indique en direct ce qui passe à la radio:" }[lang]}</span>
-					<ul>
-						{["music", "speech", "ads"].map(function(type, index) {
-							return (
-								<ColorItem key={"type" + index}>
-									<ColorDot style={{backgroundColor: colorByType(type)}} alt={self.translateContentName(type, lang)}></ColorDot>
-									<ColorLabel>{self.translateContentName(type, lang)}</ColorLabel>
-								</ColorItem>
-							);
-						})}
-					</ul>
-					<span>{{ en: "For each radio in your playlist, you can automatically skip ads and/or chit-chat", fr: "Pour chacune des radios de votre playlist, vous pouvez passer automatiquement les pubs et/ou les prises de parole."}[lang]}</span>
-
-					{loggedAs &&
-						<ProfileContainer>
-							<LoginIcon src={userIcon} />
-							<span>{loggedAs}</span> {/*{{ en: "Connected to Adblock Radio with the account ", fr: "Connecté à Adblock Radio avec le compte " }[lang] + */}
-						</ProfileContainer>
-					}
-					<ChoiceL10nContainer>
-						{["en", "fr"].map(function(lang, index) {
-							return (
-								<FlagContainer country={lang}
-									key={index}
-									selected={self.props.locale === lang}
-									onClick={() => self.props.setLocale(lang)}
-									width={32}
-									height={24} >
-								</FlagContainer>
-							);
-						})}
-					</ChoiceL10nContainer>
-				</PlaylistItem>
 				{!playlistEmpty &&
 					<PlaylistSectionTitle>{{ en: "Your playlist", fr: "Votre playlist" }[lang]}</PlaylistSectionTitle>
 				}
@@ -139,20 +104,6 @@ class Playlist extends Component {
 								</PlaylistItemText>
 								<RemoveIcon src={removeIcon} onClick={function() { self.remove(radio.country, radio.name); }} />
 							</PlaylistItemTopRow>
-							<PlaylistItemConfigContainer>
-								{["ads", "speech"].map(function(type, j) {
-									return (
-										<PlaylistItemConfigItem key={"item" + i + "config" + j}>
-											<Checkbox
-												checked={!radio.content[type] && !!self.props.config.user.email}
-												onChange={(e) => self.props.toggleContent(radio.country, radio.name, type, !e.target.checked, self.componentDidMount)}
-												disabled={!self.props.config.user.email}
-											/>
-											&nbsp; {{ en: "skip " + self.translateContentName(type, lang), fr: "zapper les " + self.translateContentName(type, lang) }[lang]}
-										</PlaylistItemConfigItem>
-									)
-								})}
-							</PlaylistItemConfigContainer>
 						</PlaylistItem>
 					)
 				})}
@@ -176,15 +127,6 @@ class Playlist extends Component {
 						</PlaylistItem>
 					)
 				})}
-				<PlaylistSectionTitle>{{en: "Terms of use", fr: "Conditions d'utilisation" }[lang]}</PlaylistSectionTitle>
-				<PlaylistItem>
-					<TOSContainer>
-						{{ en: "Adblock Radio Buffer. All rights reserved, Alexandre Storelli, 2018", fr: "Adblock Radio Buffer. Tous droits réservés, Alexandre Storelli, 2018." }[lang]}<br />
-						{{ en: "This website is not intended to be available to the public", fr: "Ce site n'a pas vocation à être diffusé au public." }[lang]}<br />
-						{{ en: "It is provided for demo purposes only", fr: "Il est mis à disposition pour un usage strictement limité à fins de démonstration." }[lang]}<br />
-						{{ en: "Only one visitor can use it at the same time", fr: "L'écoute est limitée à un seul utilisateur simultané."}[lang]}
-					</TOSContainer>
-				</PlaylistItem>
 			</PlaylistContainer>
 		)
 	}

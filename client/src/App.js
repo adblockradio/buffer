@@ -5,6 +5,7 @@ import './App.css';
 //import Radio from './Radio.js';
 //import Metadata from './Metadata.js';
 import DelayCanvas from './DelayCanvas.js';
+import Config from './Config.js';
 import Playlist from './Playlist.js';
 
 import { load, refreshMetadata, refreshAvailableCache, HOST } from './load.js';
@@ -18,8 +19,9 @@ import async from 'async';
 //import iconPlay from "./img/start_1279169.svg";
 import iconStop from "./img/stop_1279170.svg";
 import iconList from "./img/list_241386.svg";
+import iconConfig from "./img/ads_135894.svg";
 //import iconNext from "./img/next_607554.svg";
-import defaultCover from "./img/default_radio_logo.svg";
+//import defaultCover from "./img/default_radio_logo.svg";
 import playing from "./img/playing.gif";
 
 
@@ -34,12 +36,14 @@ class App extends Component {
 			playingDelay: null,
 			clockDiff: 0,
 			playlistEditMode: false,
+			configEditMode: false,
 			locale: "fr"
 		}
 		this.play = this.play.bind(this);
 		//this.seekBackward = this.seekBackward.bind(this);
 		//this.seekForward = this.seekForward.bind(this);
 		this.switchPlaylistEditMode = this.switchPlaylistEditMode.bind(this);
+		this.switchConfigEditMode = this.switchConfigEditMode.bind(this);
 		this.refreshMetadataContainer = this.refreshMetadataContainer.bind(this);
 		this.refreshConfig = this.refreshConfig.bind(this);
 		this.insertRadio = this.insertRadio.bind(this);
@@ -184,7 +188,8 @@ class App extends Component {
 		var classes = this.state[radio + "|class"];
 		if (!classes) {
 			if (DEBUG) console.log("no classes metadata to use for radio " + radio);
-			return callback({ err: "no class metadata", delayChanged: false, hasAcceptableContent: null }); // no classes metadata to use
+			return callback({ err: "no class metadata", delayChanged: false, hasAcceptableContent: true });
+			// no classes metadata to use. acceptable content by default
 		}
 
 		var iCurrentClass = -1;
@@ -195,12 +200,14 @@ class App extends Component {
 				break;
 			}
 		}
-		if (iCurrentClass < 0) {
+		/*if (iCurrentClass < 0 ) {
 			if (DEBUG) console.log("there are no metadata available for the given position.");
-			return callback({ err: "no metadata", delayChanged: false, hasAcceptableContent: null }); // there are no metadata available for the current playing position.
-		}
+			return callback({ err: "no metadata", delayChanged: false, hasAcceptableContent: null });
+			iCurrentClass = classes.length-1;
+			// there are no metadata available for the current playing position.
+		}*/
 
-		if (!this.acceptableContent(iRadio, classes[iCurrentClass])) {
+		if (iCurrentClass >= 0 && !this.acceptableContent(iRadio, classes[iCurrentClass])) {
 			// that radio has bad content, we move the cursor forward until we find a good content.
 			// we scan classes at later times, i.e. at lower indexes.
 			var iTargetClass = -1;
@@ -213,7 +220,7 @@ class App extends Component {
 			}
 
 			if (iTargetClass >= 0) {
-				var delay = +this.state.date - classes[iTargetClass].validFrom;
+				var delay = Math.floor((+this.state.date - classes[iTargetClass].validFrom)/1000)*1000;
 				//var delay1 = +this.state.date - this.state[radio + "|lastPlayedDate"];
 				//var delay = Math.max(delay0, delay1);
 				if (DEBUG) console.log("fast forward to delay " + delay);
@@ -316,7 +323,11 @@ class App extends Component {
 	}*/
 
 	switchPlaylistEditMode() {
-		this.setState({ playlistEditMode: !this.state.playlistEditMode });
+		this.setState({ playlistEditMode: !this.state.playlistEditMode, configEditMode: false });
+	}
+
+	switchConfigEditMode() {
+		this.setState({ configEditMode: !this.state.configEditMode, playlistEditMode: false });
 	}
 
 	setLocale(lang) {
@@ -397,6 +408,7 @@ class App extends Component {
 
 		var buttons = (
 			<StatusButtonsContainer>
+				<PlaybackButton className={classNames({ inactive: !self.state.configEditMode })} src={iconConfig} alt={{ en: "Edit config", fr: "Configurer l'écoute" }[lang]} onClick={self.switchConfigEditMode} />
 				<PlaybackButton className={classNames({ inactive: !self.state.playlistEditMode })} src={iconList} alt={{ en: "Edit playlist", fr: "Changer de liste de radios" }[lang]} onClick={self.switchPlaylistEditMode} />
 				{/*<PlaybackButton className={classNames({ flip: true, inactive: !self.state.playingRadio || self.state.playingDelay >= self.state.config.user.cacheLen*1000 })} src={iconPlay} alt="Backward 30s" onClick={self.seekBackward} />*/}
 				<PlaybackButton className={classNames({ inactive: !self.state.playingRadio })} src={iconStop} alt="Stop" onClick={() => self.play(null, null, null)} />
@@ -407,14 +419,19 @@ class App extends Component {
 		//console.log("Metadata props: date=" + (+self.state.date) + " clockDiff=" + self.state.clockDiff + " playingDelay=" + self.state.playingDelay);
 
 		let mainContents;
-		if (self.state.playlistEditMode || config.radios.length === 0) {
+		if (self.state.configEditMode || !config.user.email) {
+			mainContents = (
+				<Config config={self.state.config}
+					toggleContent={self.toggleContent}
+					locale={self.state.locale}
+					setLocale={self.setLocale} />
+			);
+		} else if (self.state.playlistEditMode || config.radios.length === 0) {
 			mainContents = (
 				<Playlist config={self.state.config}
 					insertRadio={self.insertRadio}
 					removeRadio={self.removeRadio}
-					toggleContent={self.toggleContent}
-					locale={self.state.locale}
-					setLocale={self.setLocale} />
+					locale={self.state.locale} />
 			);
 		} else {
 			mainContents = (
@@ -438,6 +455,16 @@ class App extends Component {
 							}
 						}
 
+						var metaText = radioObj.name;
+						if (liveMetadata && liveMetadata.payload) {
+							var p = liveMetadata.payload;
+							if (p.artist && p.title) {
+								metaText = p.artist + " - " + p.title;
+							} else if (p.artist || p.title) {
+								metaText = p.artist || p.title;
+							}
+						}
+
 						return (
 							<RadioItem className={classNames({ playing: playing })}
 								id={"RadioItem" + i}
@@ -445,16 +472,14 @@ class App extends Component {
 
 								<RadioItemTopLine onClick={function() { self.play(radio, null, null); }}>
 									<RadioLogo src={radioObj.favicon} alt={radio} />
-									{liveMetadata &&
-										<MetadataItem>
-											<MetadataText>
-												{liveMetadata.payload.artist} - {liveMetadata.payload.title}
-											</MetadataText>
-											{liveMetadata.payload.cover &&
-												<MetadataCover src={liveMetadata.payload.cover || defaultCover} alt="metadata" />
-											}
-										</MetadataItem>
-									}
+									<MetadataItem>
+										<MetadataText>
+											{metaText}
+										</MetadataText>
+										{liveMetadata && liveMetadata.payload && liveMetadata.payload.cover &&
+											<MetadataCover src={liveMetadata.payload.cover} />
+										}
+									</MetadataItem>
 								</RadioItemTopLine>
 
 								{metaList &&
@@ -482,14 +507,16 @@ class App extends Component {
 					{mainContents}
 				</AppView>
 				<Controls>
-					{self.state.playingRadio &&
-						<PlayingGif src={playing} />
-					}
-					{status}
-					{buttons}
-					{/*metaList={self.state[self.state.playingRadio + "|metadata"]}*/}
+					<MaxWidthContainer>
+						{self.state.playingRadio &&
+							<PlayingGif src={playing} />
+						}
+						{status}
+						{buttons}
+						{/*metaList={self.state[self.state.playingRadio + "|metadata"]}*/}
 
-					{/*<PlayerStatus settings={this.props.settings} bsw={this.props.bsw} condensed={this.props.condensed} playbackAction={this.togglePlayer} />*/}
+						{/*<PlayerStatus settings={this.props.settings} bsw={this.props.bsw} condensed={this.props.condensed} playbackAction={this.togglePlayer} />*/}
+					</MaxWidthContainer>
 				</Controls>
 			</AppParent>
 		);
@@ -588,13 +615,19 @@ const Controls = styled.div`
 	z-index: 1000;
 	background: #eee;
 	height: 60px;
-	align-items: center;
-	display: flex;
 	border-top: 2px solid #888;
 	bottom: 0;
 	position: fixed;
 	width: 100%;
+`;
+
+const MaxWidthContainer = styled.div`
+	max-width: 600px;
+	margin: auto;
+	align-items: center;
+	display: flex;
 	justify-content: space-between;
+	height: 100%;
 `;
 
 const StatusTextContainer = styled.span`
@@ -614,11 +647,12 @@ const DelayText = styled.span`
 const StatusButtonsContainer = styled.span`
 	padding: 5px 0 0 0;
 	flex-shrink: 0;
+	margin-right: 20px;
 `;
 
 const PlaybackButton = styled.img`
 	height: 35px;
-	margin-right: 7px;
+	margin-left: 7px;
 	cursor: pointer;
 	margin-top: 0px;
 
