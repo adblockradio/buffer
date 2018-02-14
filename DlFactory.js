@@ -4,8 +4,8 @@ var { Writable, Duplex } = require("stream");
 var log = require("./log.js")("DlFactory");
 var cp = require("child_process");
 var fs = require("fs");
-var { getMeta } = require("webradio-metadata");
-var { StreamDl } = require("../adblockradio-dl/dl.js");
+var { getMeta } = require("../webradio-metadata/getStreamMetadata.js"); // TODO use npm package
+var { StreamDl } = require("../adblockradio-dl/dl.js"); // TODO publish source ?
 //var config = require("./config.js");
 
 class Db {
