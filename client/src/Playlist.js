@@ -5,13 +5,9 @@ import PropTypes from "prop-types";
 import styled from "styled-components";
 import { load } from './load.js';
 import classNames from 'classnames';
-import Checkbox from 'rc-checkbox';
 import 'rc-checkbox/assets/index.css';
-import FlagContainer from "./Flag.js";
 import defaultCover from "./img/default_radio_logo.svg";
-import userIcon from "./img/user_1085539.svg";
 import removeIcon from "./img/remove_991614.svg";
-import { colorByType } from "./colors.js";
 
 class Playlist extends Component {
 	constructor(props) {
@@ -87,7 +83,6 @@ class Playlist extends Component {
 		var available = this.state.radios;
 		var playlistFull = this.props.config.radios.length >= this.props.config.user.maxRadios;
 		var playlistEmpty = this.props.config.radios.length === 0;
-		var loggedAs = self.props.config.user.email;
 
 		return (
 			<PlaylistContainer>
@@ -149,43 +144,6 @@ const PlaylistSectionTitle = styled.h3`
 	margin: 10px 10px 0px 10px;
 `;
 
-const TOSContainer = styled.p`
-	margin: 10px;
-	text-align: center;
-	font-size: 12px;
-`;
-
-const ColorItem = styled.li`
-	display: flex;
-	margin-bottom: 3px;
-`;
-
-const ColorDot = styled.span`
-	width: 18px;
-	height: 18px;
-	border-radius: 9px;
-`;
-
-const ColorLabel = styled.span`
-	align-self: center;
-	margin-left: 10px;
-`;
-
-const ProfileContainer = styled.div`
-	text-align: center;
-	margin: 10px;
-`;
-
-const LoginIcon = styled.img`
-	width: 32px;
-	vertical-align: middle;
-	margin: 0 10px 0 0;
-`;
-
-const ChoiceL10nContainer = styled.div`
-	align-self: center;
-`;
-
 const PlaylistItem = styled.div`
 	border: 2px solid #eee;
 	border-radius: 10px;
@@ -231,17 +189,6 @@ const AddIcon = styled.img`
 	height: 32px;
 	align-self: center;
 	transform: rotate(45deg);
-`;
-
-const PlaylistItemConfigContainer = styled.div`
-	flex-grow: 1;
-	margin-top: 10px;
-`;
-
-const PlaylistItemConfigItem = styled.label`
-	margin-right: 10px;
-	display: block;
-	margin: 5px 5px 0 5px;
 `;
 
 const SoloMessage = styled.div`

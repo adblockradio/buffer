@@ -3,20 +3,15 @@
 import React, { Component } from "react";
 import PropTypes from "prop-types";
 import styled from "styled-components";
-import { load } from './load.js';
-import classNames from 'classnames';
+//import classNames from 'classnames';
 import Checkbox from 'rc-checkbox';
 import 'rc-checkbox/assets/index.css';
 import FlagContainer from "./Flag.js";
 import defaultCover from "./img/default_radio_logo.svg";
 import userIcon from "./img/user_1085539.svg";
-import removeIcon from "./img/remove_991614.svg";
 import { colorByType } from "./colors.js";
 
 class Config extends Component {
-	constructor(props) {
-		super(props);
-	}
 
 	translateContentName(type, lang) {
 		switch (type) {
@@ -36,7 +31,6 @@ class Config extends Component {
 		var lang = this.props.locale;
 		var self = this;
 		var current = this.props.config.radios;
-		var playlistFull = this.props.config.radios.length >= this.props.config.user.maxRadios;
 		var playlistEmpty = this.props.config.radios.length === 0;
 		var loggedAs = this.props.config.user.email;
 
@@ -204,19 +198,6 @@ const PlaylistItemLogo = styled.img`
 	border: 1px solid grey;
 `;
 
-const RemoveIcon = styled.img`
-	width: 32px;
-	height: 32px;
-	align-self: center;
-`;
-
-const AddIcon = styled.img`
-	width: 32px;
-	height: 32px;
-	align-self: center;
-	transform: rotate(45deg);
-`;
-
 const PlaylistItemConfigContainer = styled.div`
 	flex-grow: 1;
 	margin-top: 10px;
@@ -233,18 +214,4 @@ const PreferencesItemTitle = styled.p`
 	margin-bottom: 0;
 `;
 
-const SoloMessage = styled.div`
-	align-self: center;
-	margin: 50px auto;
-	padding: 20px 40px;
-	background: white;
-	border: 1px solid grey;
-	border-radius: 20px;
-`;
-
 export default Config;
-
-/*&.playing {
-	width: 60px;
-	height: 60px;
-}*/
