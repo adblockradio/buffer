@@ -10,6 +10,8 @@ import FlagContainer from "./Flag.js";
 import defaultCover from "./img/default_radio_logo.svg";
 import userIcon from "./img/user_1085539.svg";
 import { colorByType } from "./colors.js";
+import { HOST } from './load.js';
+
 
 class Config extends Component {
 
@@ -95,6 +97,8 @@ class Config extends Component {
 							);
 						})}
 					</ChoiceL10nContainer>
+					<PreferencesItemTitle>{{ en: "Server path:", fr: "Serveur :"}[lang] + " " + HOST}</PreferencesItemTitle>
+
 					<PreferencesItemTitle>{{ en: "Connected to Adblock Radio as:", fr: "Connecté à Adblock Radio en tant que :"}[lang]}</PreferencesItemTitle>
 					{loggedAs &&
 						<ProfileContainer>

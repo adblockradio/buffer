@@ -8,7 +8,7 @@ import DelayCanvas from './DelayCanvas.js';
 import Config from './Config.js';
 import Playlist from './Playlist.js';
 
-import { load, refreshMetadata, refreshAvailableCache, HOST } from './load.js';
+import { load, refreshStatus, HOST } from './load.js';
 import { play, stop, setVolume } from './audio.js';
 import styled from "styled-components";
 /*import * as moment from 'moment';*/
@@ -37,14 +37,15 @@ class App extends Component {
 			clockDiff: 0,
 			playlistEditMode: false,
 			configEditMode: false,
-			locale: "fr"
+			locale: "fr",
+			stopUpdates: false
 		}
 		this.play = this.play.bind(this);
 		//this.seekBackward = this.seekBackward.bind(this);
 		//this.seekForward = this.seekForward.bind(this);
 		this.switchPlaylistEditMode = this.switchPlaylistEditMode.bind(this);
 		this.switchConfigEditMode = this.switchConfigEditMode.bind(this);
-		this.refreshMetadataContainer = this.refreshMetadataContainer.bind(this);
+		this.refreshStatusContainer = this.refreshStatusContainer.bind(this);
 		this.refreshConfig = this.refreshConfig.bind(this);
 		this.insertRadio = this.insertRadio.bind(this);
 		this.removeRadio = this.removeRadio.bind(this);
@@ -53,7 +54,10 @@ class App extends Component {
 	}
 
 	componentDidMount() {
-		this.refreshConfig();
+		var self = this;
+		this.refreshConfig(function() {
+			if (self.state.config.radios.length === 0) self.setState({ playlistEditMode: true });
+		});
 		this.timerID = setInterval(() => this.tick(), 400);
 	}
 
@@ -62,30 +66,55 @@ class App extends Component {
 		clearInterval(this.metadataTimerID);
 	}
 
-	refreshMetadataContainer() {
+	refreshStatusContainer(options) {
+		if (this.state.stopUpdates) return;
+
+		//console.log("refresh status");
 		var self = this;
-		var stateChange = {};
-		var f = function(iradio, callback) {
-			if (iradio >= self.state.config.radios.length) return callback();
-			var radio = self.state.config.radios[iradio].country + "_" + self.state.config.radios[iradio].name;
-			refreshMetadata(radio, function(metadata) {
-				for (var type in metadata) {
-					if (type === "now") {
-						stateChange.clockDiff = +new Date() - metadata.now;
-					} else {
-						metadata[type][metadata[type].length-1].validTo = null;
-						stateChange[radio + "|" + type] = metadata[type].reverse();
+		refreshStatus(this.state.config.radios, options, function(resParsed) {
+			//console.log("refresh status callback");
+			var stateChange = {};
+			var types = ["class", "metadata", "volume"];
+			for (var i=0; i<resParsed.length; i++) { // for each radio
+				var radio = resParsed[i].country + "_" + resParsed[i].name;
+				stateChange[radio + "|available"] = resParsed[i].available;
+				stateChange.clockDiff = +new Date() - resParsed[i].now;
+
+				for (var j=0; j<types.length; j++) { // for each of ["class", "metadata", "volume"]
+					if (!resParsed[i][types[j]]) {
+						//console.log("refreshStatus: radio=" + radio + " has no field " + types[j]);
+						continue;
 					}
+					var tO = resParsed[i][types[j]];
+					tO[tO.length-1].validTo = null;
+
+					var rt = radio + "|" + types[j];
+					stateChange[rt] = self.state[rt] || [];
+					for (var itO=0; itO<tO.length; itO++) {
+						var alreadyThere = false;
+						var itS;
+						for (itS=stateChange[rt].length-1; itS>=0; itS--) {
+							if (stateChange[rt][itS].validTo && stateChange[rt][itS].validTo < +self.state.date - self.state.config.user.cacheLen*1000) {
+								//if (types[j] === "class") console.log("refreshStatus: " + rt + " remove old item validTo=" + stateChange[rt][itS].validTo);
+								stateChange[rt].splice(itS, 1); // remove old elements
+							} else if (tO[itO].validFrom === stateChange[rt][itS].validFrom) {
+								alreadyThere = true;
+								break;
+							}
+						}
+						if (alreadyThere && tO[itO].validTo !== null && stateChange[rt][itS].validTo === null) { // we overwrite the last element, because validTo was erased
+							//if (types[j] === "class") console.log("refreshStatus: " + rt + " overwrite validFrom=" + tO[itO].validFrom);
+							stateChange[rt][itS] = tO[itO];
+						} else if (!alreadyThere) {
+							//if (types[j] === "class") console.log("refreshStatus: " + rt + " unshift validFrom=" + tO[itO].validFrom);
+							stateChange[rt].unshift(tO[itO]);
+						}
+					}
+					//stateChange[radio + "|" + types[j]] = tO.reverse();
 				}
-				f(iradio+1, callback);
-			});
-		}
-		f(0, function() {
-			refreshAvailableCache(self.state.config.radios, function(stateCache) {
-				Object.assign(stateChange, stateCache);
-				//console.log("stateChange = " + JSON.stringify(stateChange));
-				self.setState(stateChange);
-			});
+			}
+
+			self.setState(stateChange);
 		});
 	}
 
@@ -101,8 +130,8 @@ class App extends Component {
 			try {
 				var config = JSON.parse(res);
 				self.setState({ config: config, configLoaded: true }, function() {
-					self.metadataTimerID = setInterval(self.refreshMetadataContainer, 2000);
-					self.refreshMetadataContainer();
+					self.metadataTimerID = setInterval(() => self.refreshStatusContainer({ requestFullData: false}), 2000);
+					self.refreshStatusContainer({ requestFullData: true });
 				});
 			} catch(e) {
 				return onError(e.message);
@@ -113,6 +142,7 @@ class App extends Component {
 	}
 
 	tick() {
+		if (this.state.stopUpdates) return;
 		var self = this;
 		this.setState({ date: new Date() }, function() {
 			if (!this.state.config || !this.state.config.radios) return;

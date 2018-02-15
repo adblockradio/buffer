@@ -62,8 +62,8 @@ exports.insertRadio = function(country, name, callback) {
 				url: radio.url,
 				codec: radio.codec,
 				favicon: radio.favicon,
-				enable: true
 			});
+			//log.debug(JSON.stringify(config.radios[config.radios.length-1]));
 			saveRadios();
 			return callback(null);
 		}
@@ -103,14 +103,13 @@ exports.getRadios = function() {
 	var radios = [];
 	for (var i=0; i<config.radios.length; i++) { // control on what data is exposed via the api
 		var radio = config.radios[i];
-		if (!radio.enable) continue;
 		radios.push({
 			country: radio.country,
 			name: radio.name,
-			enable: radio.enable,
 			content: radio.content,
 			url: radio.enabled,
-			favicon: radio.favicon
+			favicon: radio.favicon,
+			codec: radio.codec
 		});
 	}
 	return radios;

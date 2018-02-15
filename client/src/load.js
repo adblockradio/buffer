@@ -26,44 +26,19 @@ exports.load = function(path, callback) {
 
 exports.HOST = HOST;
 
-exports.refreshMetadata = function(radio, callback) {
-	exports.load("/metadata/" + encodeURIComponent(radio) + "/0", function(err, res) {
+exports.refreshStatus = function(radios, options, callback) {
+	var since = options.requestFullData ? "900" : "10";
+	exports.load("/status/" + since + "?t=" + Math.round(Math.random()*1000000), function(err, res) {
 		if (err) {
-			return console.log("refreshMetadata: could not get meta for radio " + radio);
+			return console.log("refreshStatus: could not load status update for radios");
 		}
-		var metadata = [];
+		var resParsed = {};
 		try {
-			metadata = JSON.parse(res);
-			//console.log(metadata);
-			//self.setState({ metadata: metadata.reverse(), metaLastRefresh: new Date() }); // most recent content at the top
+			resParsed = JSON.parse(res);
 		} catch(e) {
 			console.log("problem parsing JSON from server: " + e.message);
 		}
-		return callback(metadata);
-		//self.setState({ metadataLoading: false });
-	});
-}
 
-exports.refreshAvailableCache = function(radios, callback) {
-	var stateChange = {};
-	var f = function(i, finished) {
-		if (i >= radios.length) return finished();
-		exports.load("/listen/" + encodeURIComponent(radios[i].country + "_" + radios[i].name) + "/available", function(err, avRes) {
-			if (err) {
-				return console.log("refreshAvailableCache: could not load cache data for radio " + radios[i].country + "_" + radios[i].name);
-			}
-			var avResParsed = {};
-			try {
-				avResParsed = JSON.parse(avRes);
-			} catch(e) {
-				console.log("problem parsing JSON from server: " + e.message);
-			}
-			stateChange[radios[i].country + "_" + radios[i].name + "|available"] = avResParsed.available;
-			return f(i+1, finished);
-		});
-	}
-	f(0, function() {
-		//console.log("load: stateChange=" + JSON.stringify(stateChange));
-		callback(stateChange);
+		callback(resParsed);
 	});
 }

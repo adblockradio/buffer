@@ -30,7 +30,7 @@ var updateDlList = function() {
 				break;
 			}
 		}
-		if (!alreadyThere && config.radios[i].enable) {
+		if (!alreadyThere) {
 			config.radios[i].liveStatus = {};
 			log.info("updateDlList: start " + config.radios[i].country + "_" + config.radios[i].name);
 			dl.push(DlFactory(config.radios[i], {
@@ -209,130 +209,144 @@ var listenRequestDate = null;
 // that share the same random query string, originally used to avoid cache issues
 var lastQueryRandomNum = null;
 
-app.get('/:action/:radio/:delay', function(request, response) {
-	var action = request.params.action;
+app.get('/status/:since', function(request, response) {
+	var result = [];
+	var since = request.params.since;
+	for (let i=0; i<config.radios.length; i++) {
+		var obj = {
+			country: config.radios[i].country,
+			name: config.radios[i].name
+		}
+		//var hasAvailable =
+		if (config.radios[i].liveStatus && config.radios[i].liveStatus.audioCache) {
+			Object.assign(obj, { available: Math.floor(config.radios[i].liveStatus.audioCache.getAvailableCache()-config.user.streamInitialBuffer) });
+		}
+		if (config.radios[i].liveStatus && config.radios[i].liveStatus.metaCache) {
+			Object.assign(obj, config.radios[i].liveStatus.metaCache.read(since));
+		}
+		result.push(obj);
+	}
+	response.set({ 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-cache, must-revalidate' });
+	response.json(result);
+});
+
+
+app.get('/listen/:radio/:delay', function(request, response) {
 	var radio = decodeURIComponent(request.params.radio);
 	var delay = request.params.delay;
-	//log.debug("get: action=" + action + " radio=" + radio + " delay=" + delay);
 
-	if (!getRadio(radio) || !getRadio(radio).enable) {
+	if (!getRadio(radio)) {
 		response.writeHead(400);
 		return response.end("radio not found");
 	}
 
-	switch(action) {
-		case "listen":
+	var state = { requestDate: new Date() }; //newRequest: true,
+	var queryRandomNum = request.query.t;
+	if (lastQueryRandomNum !== null && queryRandomNum == lastQueryRandomNum) {
+		log.warn("listen: discarding second listen request with same query string");
+		response.writeHead(400);
+		return response.end("query string must change at every request");
+	}
+	listenRequestDate = state.requestDate;
+	lastQueryRandomNum = queryRandomNum;
 
-			if (delay == "available") {
-				response.set({ 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-cache, must-revalidate' });
-				response.json({ radio: radio, available: Math.floor(getRadio(radio).liveStatus.audioCache.getAvailableCache()-config.user.streamInitialBuffer)});
-				return;
-			}
+	var radioObj = getRadio(radio);
+	var initialBuffer = radioObj.liveStatus.audioCache.readLast(+delay+config.user.streamInitialBuffer,config.user.streamInitialBuffer);
+	//log.debug("listen: readCursor set to " + radioObj.liveStatus.audioCache.readCursor);
 
-			var state = { requestDate: new Date() }; //newRequest: true,
-			var queryRandomNum = request.query.t;
-			if (lastQueryRandomNum !== null && queryRandomNum == lastQueryRandomNum) {
-				log.warn("listen: discarding second listen request with same query string");
-				response.writeHead(400);
-				return response.end("query string must change at every request");
+	if (!initialBuffer) {
+		log.error("/listen/" + radio + "/" + delay + ": initialBuffer not available");
+		response.writeHead(400);
+		return response.end("buffer not available");
+	}
+
+	log.info("listen: send initial buffer of " + initialBuffer.length + " bytes (" + getDeviceInfoExpress(request) + ")");
+
+	switch(radioObj.codec) {
+		case "AAC": response.set('Content-Type', 'audio/aacp'); break;
+		case "MP3": response.set('Content-Type', 'audio/mpeg'); break;
+		default: log.warn("unsupported codec: " + radioObj.codec);
+	}
+
+	response.write(initialBuffer);
+
+	var finish = function() {
+		clearInterval(listenTimer);
+		response.end();
+	}
+
+	var listenTimer = setInterval(function() {
+		var willWaitDrain = !response.write("");
+		if (!willWaitDrain) { // detect congestion of stream
+			sendMore();
+		} else {
+			log.debug("listenHandler: will wait for drain event");
+
+			var drainCallback = function() {
+				clearTimeout(timeoutMonitor);
+				sendMore();
 			}
+			response.once("drain", drainCallback);
+			var timeoutMonitor = setTimeout(function() {
+				response.removeListener("drain", drainCallback);
+				log.error("listenHandler: drain event not emitted, connection timeout");
+				return finish();
+			}, config.user.streamGranularity*1500);
+		}
+	}, 1000*config.user.streamGranularity);
+
+	var sendMore = function() {
+		/*if (state.newRequest) {
 			listenRequestDate = state.requestDate;
-			lastQueryRandomNum = queryRandomNum;
-
-			var radioObj = getRadio(radio);
-			var initialBuffer = radioObj.liveStatus.audioCache.readLast(+delay+config.user.streamInitialBuffer,config.user.streamInitialBuffer);
-			//log.debug("listen: readCursor set to " + radioObj.liveStatus.audioCache.readCursor);
-
-			if (!initialBuffer) {
-				log.error("/listen/" + radio + "/" + delay + ": initialBuffer not available");
-				response.writeHead(400);
-				return response.end("buffer not available");
-			}
-
-			log.info("listen: send initial buffer of " + initialBuffer.length + " bytes (" + getDeviceInfoExpress(request) + ")");
-
-			switch(radioObj.codec) {
-				case "AAC": response.set('Content-Type', 'audio/aacp'); break;
-				case "MP3": response.set('Content-Type', 'audio/mpeg'); break;
-				default: log.warn("unsupported codec: " + radioObj.codec);
-			}
-
-			response.write(initialBuffer);
-
-			var finish = function() {
-				clearInterval(listenTimer);
-				response.end();
-			}
-
-			var listenTimer = setInterval(function() {
-				var willWaitDrain = !response.write("");
-				if (!willWaitDrain) { // detect congestion of stream
-					sendMore();
-				} else {
-					log.debug("listenHandler: will wait for drain event");
-
-					var drainCallback = function() {
-						clearTimeout(timeoutMonitor);
-						sendMore();
-					}
-					response.once("drain", drainCallback);
-					var timeoutMonitor = setTimeout(function() {
-						response.removeListener("drain", drainCallback);
-						log.error("listenHandler: drain event not emitted, connection timeout");
-						return finish();
-					}, config.user.streamGranularity*1500);
-				}
-			}, 1000*config.user.streamGranularity);
-
-			var sendMore = function() {
-				/*if (state.newRequest) {
-					listenRequestDate = state.requestDate;
-					state.newRequest = false;
-				} else*/
-				if (listenRequestDate !== state.requestDate) {
-					log.warn("request canceled because another one has been initiated");
-					return finish();
-				}
-				var radioObj = getRadio(radio);
-				if (!radioObj) {
-					log.error("/listen/" + radio + "/" + delay + ": radio not available");
-					return finish();
-				}
-				var audioCache = radioObj.liveStatus.audioCache;
-				if (!audioCache) {
-					log.error("/listen/" + radio + "/" + delay + ": audioCache not available");
-					return finish();
-				}
-				var prevReadCursor = audioCache.readCursor;
-				response.write(audioCache.readAmountAfterCursor(config.user.streamGranularity));
-				//log.debug("listen: readCursor date=" + state.requestDate + " : " + prevReadCursor + " => " + audioCache.readCursor);
-			}
-			break;
-
-		case "metadata":
-			response.set({ 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-cache, must-revalidate' });
-			var radio = getRadio(radio);
-			if (!radio) {
-				log.error("/metadata/" + radio + "/" + delay + ": radio not available");
-				response.writeHead(400);
-				return response.end("radio not found");
-			} else if (!radio.liveStatus) {
-				log.error("/metadata/" + radio + "/" + delay + ": radio.liveStatus not available");
-				response.writeHead(400);
-				return response.end("radio not ready");
-			} else if (!radio.liveStatus.metaCache) {
-				log.error("/metadata/" + radio + "/" + delay + ": metadata not available");
-				response.writeHead(400);
-				return response.end("metadata not available");
-			}
-			response.json(radio.liveStatus.metaCache.read());
-			break;
-
-		default:
-			response.writeHead(400);
-			response.end("unknown route");
+			state.newRequest = false;
+		} else*/
+		if (listenRequestDate !== state.requestDate) {
+			log.warn("request canceled because another one has been initiated");
+			return finish();
+		}
+		var radioObj = getRadio(radio);
+		if (!radioObj) {
+			log.error("/listen/" + radio + "/" + delay + ": radio not available");
+			return finish();
+		}
+		var audioCache = radioObj.liveStatus.audioCache;
+		if (!audioCache) {
+			log.error("/listen/" + radio + "/" + delay + ": audioCache not available");
+			return finish();
+		}
+		var prevReadCursor = audioCache.readCursor;
+		response.write(audioCache.readAmountAfterCursor(config.user.streamGranularity));
+		//log.debug("listen: readCursor date=" + state.requestDate + " : " + prevReadCursor + " => " + audioCache.readCursor);
 	}
 });
+
+
+/*app.get('/metadata/:radio/:delay', function(request, response) {
+	var radio = decodeURIComponent(request.params.radio);
+	var delay = request.params.delay;
+
+	if (!getRadio(radio)) {
+		response.writeHead(400);
+		return response.end("radio not found");
+	}
+
+	response.set({ 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-cache, must-revalidate' });
+	var radio = getRadio(radio);
+	if (!radio) {
+		log.error("/metadata/" + radio + "/" + delay + ": radio not available");
+		response.writeHead(400);
+		return response.end("radio not found");
+	} else if (!radio.liveStatus) {
+		log.error("/metadata/" + radio + "/" + delay + ": radio.liveStatus not available");
+		response.writeHead(400);
+		return response.end("radio not ready");
+	} else if (!radio.liveStatus.metaCache) {
+		log.error("/metadata/" + radio + "/" + delay + ": metadata not available");
+		response.writeHead(400);
+		return response.end("metadata not available");
+	}
+	response.json(radio.liveStatus.metaCache.read(delay));
+});*/
 
 
 var getIPExpress = function(request) {

@@ -310,9 +310,33 @@ class MetaCache extends Writable {
 		next();
 	}
 
-	read() {
-		this.meta.now = +new Date();
-		return this.meta;
+	read(since) {
+		if (!since) {
+			this.meta.now = +new Date();
+			return this.meta;
+		} else {
+			var result = { now: +new Date() };
+			var thrDate = result.now - since*1000;
+			typeloop:
+			for (var type in this.meta) {
+				if (type == "now") continue typeloop;
+				if (thrDate < this.meta[type][0].validFrom) {
+					result[type] = this.meta[type];
+					continue;
+				} else {
+					itemloop:
+					for (var i=0; i<this.meta[type].length; i++) {
+						if (this.meta[type][i].validFrom <= thrDate && thrDate < this.meta[type][i].validTo) {
+							result[type] = this.meta[type].slice(i);
+							break itemloop;
+						}
+					}
+					continue;
+				}
+				log.warn("MetaCache: read since " + since + "s: no data found for type " + type);
+			}
+			return result;
+		}
 	}
 }
 
