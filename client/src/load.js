@@ -29,7 +29,7 @@ exports.HOST = HOST;
 
 exports.refreshStatus = function(radios, options, callback) {
 	var since = options.requestFullData ? "900" : "10";
-	exports.load("/status/" + since + "?t=" + Math.round(Math.random()*1000000), function(err, res) {
+	exports.load("status/" + since + "?t=" + Math.round(Math.random()*1000000), function(err, res) {
 		if (err) {
 			return console.log("refreshStatus: could not load status update for radios");
 		}

@@ -7,4 +7,4 @@ scp *.js dome:/home/alexandre/buffer-server/.
 scp *.json dome:/home/alexandre/buffer-server/.
 cd client/
 npm run build
-scp -r build/* dome:/var/www/html/buffer/.
+scp -r build dome:/home/alexandre/buffer-server/client/.

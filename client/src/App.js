@@ -4,7 +4,7 @@ import React, { Component } from 'react';
 import './App.css';
 //import Radio from './Radio.js';
 //import Metadata from './Metadata.js';
-import DelayCanvas from './DelayCanvas.js';
+import DelaySVG from './DelaySVG.js';
 import Config from './Config.js';
 import Playlist from './Playlist.js';
 
@@ -651,7 +651,7 @@ class App extends Component {
 								</RadioItemTopLine>
 
 								{self.state[radio + "|metadata"] &&
-									<DelayCanvas cursor={+self.state.date - self.state[radio + "|cursor"]}
+									<DelaySVG cursor={+self.state.date - self.state[radio + "|cursor"]}
 										availableCache={self.state[radio + "|available"]}
 										classList={self.state[radio + "|class"]}
 										date={new Date(+self.state.date - self.state.clockDiff)}
