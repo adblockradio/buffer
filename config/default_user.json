@@ -1,0 +1,8 @@
+{
+	"token": "",
+	"cacheLen": 900,
+	"streamInitialBuffer": 8,
+	"streamGranularity": 1,
+	"maxRadios": 3,
+	"discardSmallSegments": 20
+}

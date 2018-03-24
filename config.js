@@ -1,8 +1,8 @@
 "use strict";
 
-var log = require("./log.js")("config");
+var { log } = require("./log.js")("config");
 var fs = require("fs");
-var { getRadioMetadata } = require("../adblockradio-dl/dl.js");
+var { getRadioMetadata } = require("adblockradio-dl");
 var { getAvailable } = require("webradio-metadata");
 var jwt = require("jsonwebtoken");
 

@@ -3,11 +3,12 @@
 
 "use strict";
 
-var log = require("./log.js")("master");
+var { log, flushLog } = require("./log.js")("master");
 var cp = require("child_process");
 var findDataFiles = require("./findDataFiles.js");
 var DlFactory = require("./DlFactory.js");
 var abrsdk = require("adblockradio-sdk")();
+//var abrsdk = require("../adblockradio-sdk/libabr.js")();
 
 const FETCH_METADATA = true;
 const SAVE_AUDIO = false;
@@ -18,8 +19,8 @@ var USE_ABRSDK = true;
 var { config, getRadios, getUserConfig, insertRadio, removeRadio, toggleContent, getAvailableInactive } = require("./config.js");
 
 var dl = [];
-var updateDlList = function() {
-	var playlistChange = false;
+var updateDlList = function(forcePlaylistUpdate) {
+	var playlistChange = false || !!forcePlaylistUpdate;
 
 	// add missing sockets
 	for (var i=0; i<config.radios.length; i++) {
@@ -102,22 +103,27 @@ var updateDlList = function() {
 
 if (USE_ABRSDK && config.user.email) {
 	log.info("abrsdk: token detected for email " + config.user.email);
-	abrsdk.connectServer(function(err) {
+	abrsdk.connectServer(function(err, isConnected) {
+	//abrsdk._newSocket(["http://localhost:3066/"], 0, function(err, isConnected) {
 		if (err) {
 			log.error("abrsdk: connection error: " + err + ". switch off sdk");
 			USE_ABRSDK = false;
 		}
-		updateDlList();
+		if (isConnected) {
+			updateDlList(true);
+		} else {
+			log.warn("SDK disconnected");
+		}
 	});
 } else {
-	updateDlList();
+	updateDlList(false);
 }
 
 var http = require('http');
 var express = require('express');
 var app = express();
 var server = http.createServer(app);
-server.listen(9820, "localhost");
+server.listen(9820); // no "localhost" binding since this routine is intended to run in a Docker container
 
 app.get('/config', function(request, response) {
 	response.set({ 'Access-Control-Allow-Origin': '*' });
@@ -296,10 +302,6 @@ app.get('/listen/:radio/:delay', function(request, response) {
 	}, 1000*config.user.streamGranularity);
 
 	var sendMore = function() {
-		/*if (state.newRequest) {
-			listenRequestDate = state.requestDate;
-			state.newRequest = false;
-		} else*/
 		if (listenRequestDate !== state.requestDate) {
 			log.warn("request canceled because another one has been initiated");
 			return finish();
@@ -320,34 +322,7 @@ app.get('/listen/:radio/:delay', function(request, response) {
 	}
 });
 
-
-/*app.get('/metadata/:radio/:delay', function(request, response) {
-	var radio = decodeURIComponent(request.params.radio);
-	var delay = request.params.delay;
-
-	if (!getRadio(radio)) {
-		response.writeHead(400);
-		return response.end("radio not found");
-	}
-
-	response.set({ 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-cache, must-revalidate' });
-	var radio = getRadio(radio);
-	if (!radio) {
-		log.error("/metadata/" + radio + "/" + delay + ": radio not available");
-		response.writeHead(400);
-		return response.end("radio not found");
-	} else if (!radio.liveStatus) {
-		log.error("/metadata/" + radio + "/" + delay + ": radio.liveStatus not available");
-		response.writeHead(400);
-		return response.end("radio not ready");
-	} else if (!radio.liveStatus.metaCache) {
-		log.error("/metadata/" + radio + "/" + delay + ": metadata not available");
-		response.writeHead(400);
-		return response.end("metadata not available");
-	}
-	response.json(radio.liveStatus.metaCache.read(delay));
-});*/
-
+app.use('/', express.static('client/build'));
 
 var getIPExpress = function(request) {
 	var ip = request.headers['x-forwarded-for']; // standard proxy header
@@ -360,3 +335,17 @@ var getDeviceInfoExpress = function(request) {
     var agent = request.headers['user-agent'];
     return "login from IP " + getIPExpress(request) + " and UA " + agent;
 }
+
+var terminateServer = function(signal) {
+	log.info("received SIGTERM signal. exiting...");
+	for (var i=0; i<dl.length; i++) {
+		dl[i].stopDl();
+	}
+	flushLog(function() {
+		console.log("log written");
+		process.exit(signal);
+	});
+}
+
+process.on('SIGTERM', terminateServer);
+process.on('SIGINT', terminateServer);

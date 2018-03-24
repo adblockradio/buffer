@@ -1,64 +1,69 @@
 // Copyright (c) 2018 Alexandre Storelli
+/* global Media */
 
-var audioElement = document.createElement('audio');
+var isCordovaApp = document.URL.indexOf('http://') === -1 && document.URL.indexOf('https://') === -1;
 
-audioElement.addEventListener("error", function(err) { // when a player error happens, blacklist the stream for 15 seconds
-	console.log("playing error: ")
-	console.log(err);
-});
+var audioElement, play, stop, setVolume;
 
-audioElement.addEventListener("play", function() {
-	console.log("playback started");
-});
-
-/*var play = function(url) {
-	stop();
-	console.log("play " + url);
-	audioElement.src = url;
-	audioElement.play();
-}
-
-var stop = function() {
-	audioElement.pause();
-	audioElement.currentTime = 0;
-	try {
-		audioElement.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAVFYAAFRWAAABAAgAZGF0YQAAAAA=';
-		audioElement.play();
-	} catch(e) {
-		// no-op
-	}
-}*/
-
-var play = function(url, callback) { // https://developers.google.com/web/updates/2017/06/play-request-was-interrupted
-	console.log("play " + url);
-	audioElement.src = url;
-	var playPromise = audioElement.play();
-	if (playPromise !== undefined) {
-		playPromise.then(_ => {
-			if (callback) callback(null);
-		})
-		.catch(error => {
-			if (callback) callback(error);
+if (isCordovaApp) {
+	play = function(url, callback) {
+		if (audioElement && audioElement.stop) audioElement.stop();
+		audioElement = new Media(url, function() {
+			console.log("stream successfully loaded");
+		}, function(err) {
+			console.log("stream loading error=" + err);
+		}, function(status) {
+			console.log("stream status=" + status);
 		});
+		audioElement.play();
 	}
-}
 
-var stop = function() {
-	audioElement.src = "";
-	audioElement.load();
-}
+	stop = function() {
+		audioElement.stop();
+	}
 
-var setVolume = function(volume) {
-	audioElement.volume = volume;
+	setVolume = function(vol) {
+		audioElement.setVolume(vol);
+	}
+
+
+} else {
+	audioElement = document.createElement('audio');
+
+	audioElement.addEventListener("error", function(err) {
+		console.log("playing error: ")
+		console.log(err);
+	});
+
+	audioElement.addEventListener("play", function() {
+		console.log("playback started");
+	});
+
+	play = function(url, callback) { // https://developers.google.com/web/updates/2017/06/play-request-was-interrupted
+		console.log("play " + url);
+		audioElement.src = url;
+		var playPromise = audioElement.play();
+		if (playPromise !== undefined) {
+			playPromise.then(_ => {
+				if (callback) callback(null);
+			})
+			.catch(error => {
+				if (callback) callback(error);
+			});
+		}
+	}
+
+	stop = function() {
+		audioElement.src = "";
+		audioElement.load();
+	}
+
+	setVolume = function(volume) {
+		audioElement.volume = volume;
+	}
+
 }
 
 exports.play = play;
 exports.stop = stop;
 exports.setVolume = setVolume;
-/*exports.getPlayerTime = function(startDate) {
-	if (!startDate) {
-		console.log("getPlayerTime: invalid startdate=" + startDate);
-		return 0;
-	}
-	return new Date(+new Date(startDate) + Math.round(1000 * audioElement.currentTime)).toISOString();
-}*/

@@ -8,7 +8,7 @@ import DelayCanvas from './DelayCanvas.js';
 import Config from './Config.js';
 import Playlist from './Playlist.js';
 
-import { load, refreshStatus, HOST } from './load.js';
+import { load, loadScript, refreshStatus, HOST } from './load.js';
 import { play, stop, setVolume } from './audio.js';
 import styled from "styled-components";
 /*import * as moment from 'moment';*/
@@ -24,6 +24,20 @@ import iconConfig from "./img/ads_135894.svg";
 //import defaultCover from "./img/default_radio_logo.svg";
 import playing from "./img/playing.gif";
 
+/* global cordova */
+
+
+var DELAYS = {
+	FETCH_UPDATES_PLAYING: 2000,
+	FETCH_UPDATES_IDLE: 5000, // if higher than 10, need to update value in load.js
+	VISUALS_ACTIVE: 1000,
+	VISUALS_HIDDEN: 10000
+}
+
+var VOLUMES = {
+	MUTED: 0.1,
+	DEFAULT: 0.5
+}
 
 class App extends Component {
 	constructor(props) {
@@ -38,7 +52,9 @@ class App extends Component {
 			playlistEditMode: false,
 			configEditMode: false,
 			locale: "fr",
-			stopUpdates: false
+			stopUpdates: false,
+			//doVisualUpdates: true
+			isCordovaApp: document.URL.indexOf('http://') === -1 && document.URL.indexOf('https://') === -1
 		}
 		this.play = this.play.bind(this);
 		//this.seekBackward = this.seekBackward.bind(this);
@@ -47,6 +63,7 @@ class App extends Component {
 		this.switchConfigEditMode = this.switchConfigEditMode.bind(this);
 		this.refreshStatusContainer = this.refreshStatusContainer.bind(this);
 		this.refreshConfig = this.refreshConfig.bind(this);
+		this.tick = this.tick.bind(this);
 		this.insertRadio = this.insertRadio.bind(this);
 		this.removeRadio = this.removeRadio.bind(this);
 		this.toggleContent = this.toggleContent.bind(this);
@@ -55,15 +72,62 @@ class App extends Component {
 
 	componentDidMount() {
 		var self = this;
+		if (this.state.isCordovaApp) {
+			console.log("detected cordova environment");
+			loadScript("./cordova.js", function() {
+				console.log("cordova script loaded");
+			});
+		} else {
+			console.log("detected web environment");
+		}
 		this.refreshConfig(function() {
 			if (self.state.config.radios.length === 0) self.setState({ playlistEditMode: true });
 		});
-		this.timerID = setInterval(() => this.tick(), 400);
+		this.newTickInterval(DELAYS.VISUALS_ACTIVE);
+
+		document.addEventListener('visibilitychange', function() {
+			//self.setState({ doVisualUpdates: !document.hidden });
+			console.log("visibilitychange: visible=" + !document.hidden);
+			self.newTickInterval(document.hidden ? DELAYS.VISUALS_HIDDEN : DELAYS.VISUALS_ACTIVE);
+		});
+
+		if (this.state.isCordovaApp) { // set up notifications actions callbacks
+			document.addEventListener("deviceready", function(){
+				self.setState({ isCordovaDeviceReady: true });
+
+				var onHop = function (notification, eopts) {
+					if (self.state.config.radios.length > 1) {
+						var index = self.getRadioIndex(self.state.playingRadio);
+						var newIndex = (index + 1) % self.state.config.radios.length;
+						var newRadio = self.state.config.radios[newIndex].country + "_" + self.state.config.radios[newIndex].name;
+						self.play(newRadio, null, function() {});
+						console.log("notification: next channel");
+					} else {
+						console.log("notification: next channel but not possible");
+					}
+				};
+				cordova.plugins.notification.local.on('hop', onHop);
+
+				var onStop = function (notification, eopts) {
+					console.log("notification: stop playback");
+					self.play(null, null, function() {});
+				};
+				cordova.plugins.notification.local.on('stop', onStop);
+			});
+		}
 	}
 
 	componentWillUnmount() {
 		clearInterval(this.timerID);
-		clearInterval(this.metadataTimerID);
+		this.newRefreshStatusInterval(0);
+	}
+
+	newRefreshStatusInterval(interval, requestFullDataAtOnce) {
+		if (this.metadataTimerID) clearInterval(this.metadataTimerID);
+		if (interval > 0) {
+			this.metadataTimerID = setInterval(() => this.refreshStatusContainer({ requestFullData: false}), interval);
+			this.refreshStatusContainer({ requestFullData: requestFullDataAtOnce });
+		}
 	}
 
 	refreshStatusContainer(options) {
@@ -114,7 +178,9 @@ class App extends Component {
 				}
 			}
 
-			self.setState(stateChange);
+			self.setState(stateChange, function() {
+				self.cordovaNotification();
+			});
 		});
 	}
 
@@ -125,13 +191,12 @@ class App extends Component {
 			self.setState({ configError: true, configLoaded: true });
 		}
 
-		load("/config?t=" + Math.round(Math.random()*1000000), function(err, res) {
+		load("config?t=" + Math.round(Math.random()*1000000), function(err, res) {
 			if (err) return onError(err);
 			try {
 				var config = JSON.parse(res);
 				self.setState({ config: config, configLoaded: true }, function() {
-					self.metadataTimerID = setInterval(() => self.refreshStatusContainer({ requestFullData: false}), 2000);
-					self.refreshStatusContainer({ requestFullData: true });
+					self.newRefreshStatusInterval(DELAYS.FETCH_UPDATES_IDLE, true);
 				});
 			} catch(e) {
 				return onError(e.message);
@@ -139,6 +204,15 @@ class App extends Component {
 
 			if (callback) callback();
 		});
+	}
+
+
+	newTickInterval(interval) {
+		if (this.timerID) clearInterval(this.timerID);
+		if (interval > 0) {
+			this.timerID = setInterval(this.tick, interval);
+			this.tick();
+		}
 	}
 
 	tick() {
@@ -152,7 +226,10 @@ class App extends Component {
 				self.checkCursor(radioName, function(res) {
 					//res = { err: ... , delayChanged: ..., hasAcceptableContent: ... }
 					acceptableContent[iRadio] = res.hasAcceptableContent;
-					if (self.state.playingRadio === radioName && res.hasAcceptableContent && res.delayChanged) {
+					if (self.state.playingRadio === radioName && res.hasAcceptableContent && !res.delayChanged) {
+						self.setVolumeForRadio(radio);
+						onCursorChecked();
+					} else if (self.state.playingRadio === radioName && res.hasAcceptableContent && res.delayChanged) {
 						// here, we know we are playing a channel with good content at the updated delay
 						self.play(radioName, null, function(err) {
 							onCursorChecked();
@@ -183,7 +260,7 @@ class App extends Component {
 				}
 				// as a last resort, turn down the volume
 				//if (DEBUG) console.log("no alt content to play, lower volume");
-				setVolume(0.1);
+				setVolume(VOLUMES.MUTED);
 			});
 		});
 	}
@@ -303,6 +380,83 @@ class App extends Component {
 		return -1;
 	}
 
+	setVolumeForRadio(radio) {
+		var targetVolume = VOLUMES.DEFAULT;
+		if (this.state[radio + "|volume"] && this.state[radio + "|volume"].length > 0) targetVolume = this.state[radio + "|volume"][0].payload;
+		setVolume(targetVolume);
+	}
+
+	getCurrentMetaForRadio(radio) {
+		var liveMetadata;
+		var metaList = this.state[radio + "|metadata"];
+		if (metaList) {
+			var targetDate = this.state[radio + "|cursor"];
+			for (let j=0; j<metaList.length; j++) {
+				if (metaList[j].validFrom - 1000 <= targetDate &&
+					(!metaList[j].validTo || (targetDate < +metaList[j].validTo - 1000)))
+				{
+						liveMetadata = metaList[j];
+						break;
+				}
+			}
+		}
+
+		if (liveMetadata && liveMetadata.payload) {
+			var metaText;
+			var p = liveMetadata.payload;
+			if (p.artist && p.title) {
+				metaText = p.artist + " - " + p.title;
+			} else if (p.artist || p.title) {
+				metaText = p.artist || p.title;
+			}
+			return { text: metaText, image: liveMetadata.payload.favicon };
+		} else {
+			return {};
+		}
+
+	}
+
+	cordovaNotification() {
+		if (!this.state.isCordovaApp || !this.state.isCordovaDeviceReady) return
+
+		if (this.state.playingRadio) {
+			var index = this.getRadioIndex(this.state.playingRadio);
+			var name = this.state.config.radios[index].name;
+			var lang = this.state.locale;
+			var meta = this.getCurrentMetaForRadio(this.state.playingRadio);
+			var hasMeta = !!meta.text;
+
+			var notifTitle = hasMeta ? name : 'Adblock Radio';
+			var notifText = hasMeta ? meta.text : name;
+
+			var self = this;
+			cordova.plugins.notification.local.get(1, function (notification) {
+				if (!notification || notification.title !== notifTitle || notification.text !== notifText) {
+					console.log("notification: show");
+					var actions = [	{ id: 'stop',  title: { en: "Stop", fr: "Stop" }[lang] } ];
+					if (self.state.config.radios.length > 1) {
+						actions.unshift({ id: 'hop', title: { en: "Change channel", fr: "Changer de station"}[lang] });
+					}
+					cordova.plugins.notification.local.schedule({
+						id: 1,
+					    title: notifTitle,
+					    text: notifText,
+					    actions: actions,
+						sticky: true,
+						led: false,
+						sound: false,
+						wakeup: false
+					});
+				}
+			});
+
+		} else {
+			cordova.plugins.notification.local.clearAll(function() {
+				console.log("notification: clear all");
+			}, this);
+		}
+	}
+
 	play(radio, delay, callback) {
 		if (radio || delay) {
 			radio = radio || this.state.playingRadio;
@@ -321,23 +475,30 @@ class App extends Component {
 			stateChange[radio + "|cursor"] = +this.state.date - delay;
 			stateChange["playingRadio"] = radio;
 			stateChange["playingDelay"] = delay;
-			this.setState(stateChange);
+			this.setState(stateChange, function() {
+				this.cordovaNotification();
+			});
 
-			setVolume(1);
-			document.title = radio.split("_")[1] + " - Adblock Radio Buffer";
-			var url = HOST + "/listen/" + encodeURIComponent(radio) + "/" + (delay/1000) + "?t=" + Math.round(Math.random()*1000000000);
+			document.title = radio.split("_")[1] + " - Adblock Radio";
+			var url = HOST + "listen/" + encodeURIComponent(radio) + "/" + (delay/1000) + "?t=" + Math.round(Math.random()*1000000000);
 			play(url, function(err) {
 				if (err) console.log("Play: error=" + err);
 				if (callback) callback(err);
 			});
+			this.setVolumeForRadio(radio);
+			this.newRefreshStatusInterval(DELAYS.FETCH_UPDATES_PLAYING, false);
 
 		} else {
 			this.setState({
 				playingRadio: null,
 				playingDelay: null
+			}, function() {
+				this.cordovaNotification();
 			});
-			document.title = "Adblock Radio Buffer";
+			document.title = "Adblock Radio";
 			stop();
+			this.newRefreshStatusInterval(DELAYS.FETCH_UPDATES_IDLE, false);
+
 			if (callback) callback(null);
 		}
 	}
@@ -366,7 +527,7 @@ class App extends Component {
 
 	insertRadio(country, name, callback) {
 		var self = this;
-		load("/config/radios/insert/" + encodeURIComponent(country) + "/" + encodeURIComponent(name) + "?t=" + Math.round(Math.random()*1000000), function(res) {
+		load("config/radios/insert/" + encodeURIComponent(country) + "/" + encodeURIComponent(name) + "?t=" + Math.round(Math.random()*1000000), function(res) {
 			self.refreshConfig(callback);
 		});
 	}
@@ -374,14 +535,14 @@ class App extends Component {
 	removeRadio(country, name, callback) {
 		if (this.state.playingRadio === country + "_" + name) this.play(null, null, function() {});
 		var self = this;
-		load("/config/radios/remove/" + encodeURIComponent(country) + "/" + encodeURIComponent(name) + "?t=" + Math.round(Math.random()*1000000), function(res) {
+		load("config/radios/remove/" + encodeURIComponent(country) + "/" + encodeURIComponent(name) + "?t=" + Math.round(Math.random()*1000000), function(res) {
 			self.refreshConfig(callback);
 		});
 	}
 
 	toggleContent(country, name, contentType, enabled, callback) {
 		var self = this;
-		load("/config/radios/content/" + encodeURIComponent(country) + "/" + encodeURIComponent(name) + "/" + encodeURIComponent(contentType) + "/" + (enabled ? "enable" : "disable") + "?t=" + Math.round(Math.random()*1000000), function(res) {
+		load("config/radios/content/" + encodeURIComponent(country) + "/" + encodeURIComponent(name) + "/" + encodeURIComponent(contentType) + "/" + (enabled ? "enable" : "disable") + "?t=" + Math.round(Math.random()*1000000), function(res) {
 			self.refreshConfig(callback);
 		});
 	}
@@ -470,31 +631,7 @@ class App extends Component {
 					{config.radios.map(function(radioObj, i) {
 						var radio = radioObj.country + "_" + radioObj.name;
 						var playing = self.state.playingRadio === radio;
-
-						var liveMetadata;
-
-						var metaList = self.state[radio + "|metadata"];
-						if (metaList) {
-							var targetDate = self.state[radio + "|cursor"];
-							for (let j=0; j<metaList.length; j++) {
-								if (metaList[j].validFrom - 1000 <= targetDate &&
-									(!metaList[j].validTo || (targetDate < +metaList[j].validTo - 1000)))
-								{
-										liveMetadata = metaList[j];
-										break;
-								}
-							}
-						}
-
-						var metaText = radioObj.name;
-						if (liveMetadata && liveMetadata.payload) {
-							var p = liveMetadata.payload;
-							if (p.artist && p.title) {
-								metaText = p.artist + " - " + p.title;
-							} else if (p.artist || p.title) {
-								metaText = p.artist || p.title;
-							}
-						}
+						var meta = self.getCurrentMetaForRadio(radio);
 
 						return (
 							<RadioItem className={classNames({ playing: playing })}
@@ -505,15 +642,15 @@ class App extends Component {
 									<RadioLogo src={radioObj.favicon} alt={radio} />
 									<MetadataItem>
 										<MetadataText>
-											{metaText}
+											{meta.text || radio}
 										</MetadataText>
-										{liveMetadata && liveMetadata.payload && liveMetadata.payload.cover &&
-											<MetadataCover src={liveMetadata.payload.cover} />
+										{meta.image &&
+											<MetadataCover src={meta.image} />
 										}
 									</MetadataItem>
 								</RadioItemTopLine>
 
-								{metaList &&
+								{self.state[radio + "|metadata"] &&
 									<DelayCanvas cursor={+self.state.date - self.state[radio + "|cursor"]}
 										availableCache={self.state[radio + "|available"]}
 										classList={self.state[radio + "|class"]}

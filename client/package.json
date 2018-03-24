@@ -20,5 +20,5 @@
     "test": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject"
   },
-  "homepage": "https://www.adblockradio.com/buffer"
+  "homepage": "."
 }

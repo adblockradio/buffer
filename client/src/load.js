@@ -7,8 +7,9 @@ var getParameterByName = function(name, url) {
 	return decodeURIComponent(results[2].replace(/\+/g, " "));
 }
 
-//var HOST = getParameterByName("dev") ? "http://localhost:9820" : "https://bufferapi.s00.adblockradio.com";
-var HOST = getParameterByName("dev") ? "http://localhost:9820" : "/bufferapi";
+//var HOST = getParameterByName("dev") ? "http://localhost:9820/" : "https://bufferapi.s00.adblockradio.com/";
+//var HOST = getParameterByName("dev") ? "http://localhost:9820/" : "/bufferapi/";
+var HOST = getParameterByName("dev") ? "https://dome.storelli.fr/bufferapi/" : "";
 
 exports.load = function(path, callback) {
 	var xhttp = new XMLHttpRequest();
@@ -41,4 +42,21 @@ exports.refreshStatus = function(radios, options, callback) {
 
 		callback(resParsed);
 	});
+}
+
+// https://stackoverflow.com/questions/950087/how-do-i-include-a-javascript-file-in-another-javascript-file
+exports.loadScript = function(url, callback) {
+	// Adding the script tag to the head as suggested before
+	var head = document.getElementsByTagName('head')[0];
+	var script = document.createElement('script');
+	script.type = 'text/javascript';
+	script.src = url;
+
+	// Then bind the event to the callback function.
+	// There are several events for cross browser compatibility.
+	script.onreadystatechange = callback;
+	script.onload = callback;
+
+	// Fire the loading
+	head.appendChild(script);
 }
