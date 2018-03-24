@@ -1,5 +1,6 @@
 // Copyright (c) 2018 Alexandre Storelli
 /* global Media */
+/* global Android */
 
 var isCordovaApp = document.URL.indexOf('http://') === -1 && document.URL.indexOf('https://') === -1;
 
@@ -26,7 +27,22 @@ if (isCordovaApp) {
 		audioElement.setVolume(vol);
 	}
 
+} else if (navigator.userAgent === "abr_android") {
 
+	// bindings to native Android APIs
+	play = function(url, callback) {
+		console.log("android: play url=" + url);
+		Android.playbackStart(url, callback);
+	}
+	stop = function() {
+		console.log("android: stop");
+		Android.playbackStop();
+	}
+	setVolume = function(vol) {
+		console.log("android: set vol=" + vol);
+		Android.playbackSetVolume(vol);
+	}
+	
 } else {
 	audioElement = document.createElement('audio');
 

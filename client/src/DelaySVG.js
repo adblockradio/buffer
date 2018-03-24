@@ -57,7 +57,7 @@ class DelaySVG extends Component {
 					default: colorClass[i] = colors.GREY;
 				}
 				xStartClass[i] = Math.max(this.delayToX(this.props.width, +this.props.date-cl.validFrom), 0);
-				xStopClass[i] = this.delayToX(this.props.width, cl.validTo ? (+this.props.date-cl.validTo) : 0);
+				xStopClass[i] = Math.min(xStartClass[i], this.delayToX(this.props.width, cl.validTo ? (+this.props.date-cl.validTo) : 0));
 				//ctx.fillRect(xStart, 0.6*height, xStop, height);
 			}
 		}
@@ -92,7 +92,8 @@ class DelaySVG extends Component {
 				})}
 				{xLines.map(function(x, i) {
 					return (
-						<line x1={x} y1={0} x2={x} y2={height} style={ticksStyle} key={"l" + i} />
+						x >= 0 &&
+							<line x1={x} y1={0} x2={x} y2={height} style={ticksStyle} key={"l" + i} />
 					)
 				})}
 

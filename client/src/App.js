@@ -54,7 +54,8 @@ class App extends Component {
 			locale: "fr",
 			stopUpdates: false,
 			//doVisualUpdates: true
-			isCordovaApp: document.URL.indexOf('http://') === -1 && document.URL.indexOf('https://') === -1
+			isCordovaApp: document.URL.indexOf('http://') === -1 && document.URL.indexOf('https://') === -1,
+			isAndroidApp: navigator.userAgent === "abr_android"
 		}
 		this.play = this.play.bind(this);
 		//this.seekBackward = this.seekBackward.bind(this);
@@ -77,6 +78,8 @@ class App extends Component {
 			loadScript("./cordova.js", function() {
 				console.log("cordova script loaded");
 			});
+		} else if (this.state.isAndroidApp) {
+			console.log("detected android environment");
 		} else {
 			console.log("detected web environment");
 		}

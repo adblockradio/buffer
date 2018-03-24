@@ -9,7 +9,7 @@ var getParameterByName = function(name, url) {
 
 //var HOST = getParameterByName("dev") ? "http://localhost:9820/" : "https://bufferapi.s00.adblockradio.com/";
 //var HOST = getParameterByName("dev") ? "http://localhost:9820/" : "/bufferapi/";
-var HOST = getParameterByName("dev") ? "https://dome.storelli.fr/bufferapi/" : "";
+var HOST = getParameterByName("dev") ? "https://dome.storelli.fr/buffer/" : "";
 
 exports.load = function(path, callback) {
 	var xhttp = new XMLHttpRequest();

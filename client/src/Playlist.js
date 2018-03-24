@@ -34,7 +34,7 @@ class Playlist extends Component {
 	componentDidMount() {
 		let self = this;
 
-		load("/config/radios/available?t=" + Math.round(Math.random()*1000000), function(err, res) {
+		load("config/radios/available?t=" + Math.round(Math.random()*1000000), function(err, res) {
 			if (err) {
 				return self.setState({ radiosLoaded: true, radiosError: true });
 			}
