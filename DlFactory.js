@@ -1,12 +1,14 @@
 "use strict";
 
 var { Writable, Duplex } = require("stream");
-var { log } = require("./log.js")("DlFactory");
+var { log } = require("./log.js")("DlF");
 var cp = require("child_process");
 var fs = require("fs");
-var { getMeta } = require("webradio-metadata");
 var { StreamDl } = require("adblockradio-dl"); // TODO publish source ?
-//var config = require("./config.js");
+const Metadata = require("webradio-metadata");
+//var { getMeta, setLog } = require("webradio-metadata");
+
+Metadata.setLog(require("./log.js")("meta"));
 
 class Db {
 	constructor(options) {
@@ -403,7 +405,7 @@ module.exports = function(radio, options) {
 				}
 
 				if (options.fetchMetadata) {
-					getMeta(radio.country, radio.name, function(err, parsedMeta, corsEnabled) {
+					Metadata.getMeta(radio.country, radio.name, function(err, parsedMeta, corsEnabled) {
 						if (err) return log.warn("getMeta: error fetching title meta for radio " + radio.country + "_" + radio.name + " err=" + err);
 						//log.debug(radio.country + "_" + radio.name + " meta=" + JSON.stringify(parsedMeta));
 						if (options.saveAudio) {

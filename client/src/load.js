@@ -19,9 +19,16 @@ exports.load = function(path, callback) {
 		}
 	};
 	xhttp.onerror = function (e) {
-		callback("getHeaders: request failed: " + e, null);
+		callback("load: request failed: " + e.message, null);
 	};
+
 	xhttp.open("GET", HOST + path, true);
+
+	xhttp.timeout = 5000; // Set timeout to 4 seconds (4000 milliseconds)
+	xhttp.ontimeout = function () {
+		callback("load: timed out", null);
+	}
+
 	xhttp.send();
 }
 
@@ -31,7 +38,8 @@ exports.refreshStatus = function(radios, options, callback) {
 	var since = options.requestFullData ? "900" : "10";
 	exports.load("status/" + since + "?t=" + Math.round(Math.random()*1000000), function(err, res) {
 		if (err) {
-			return console.log("refreshStatus: could not load status update for radios");
+			console.log("refreshStatus: could not load status update for radios (" + err + ")");
+			return callback(err, null);
 		}
 		var resParsed = {};
 		try {
@@ -40,7 +48,7 @@ exports.refreshStatus = function(radios, options, callback) {
 			console.log("problem parsing JSON from server: " + e.message);
 		}
 
-		callback(resParsed);
+		callback(null, resParsed);
 	});
 }
 

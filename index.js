@@ -3,12 +3,12 @@
 
 "use strict";
 
-var { log, flushLog } = require("./log.js")("master");
-var cp = require("child_process");
-var findDataFiles = require("./findDataFiles.js");
-var DlFactory = require("./DlFactory.js");
-var abrsdk = require("adblockradio-sdk")();
-//var abrsdk = require("../adblockradio-sdk/libabr.js")();
+const { log, flushLog } = require("./log.js")("master");
+const cp = require("child_process");
+const findDataFiles = require("./findDataFiles.js");
+const DlFactory = require("./DlFactory.js");
+const abrsdk = require("adblockradio-sdk")(require("./log.js")("sdk").log);
+//const abrsdk = require("../adblockradio-sdk/libabr.js")(require("./log.js")("sdk").log);
 
 const FETCH_METADATA = true;
 const SAVE_AUDIO = false;

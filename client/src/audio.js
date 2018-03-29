@@ -35,14 +35,14 @@ if (isCordovaApp) {
 		Android.playbackStart(url, callback);
 	}
 	stop = function() {
-		console.log("android: stop");
+		//console.log("android: stop");
 		Android.playbackStop();
 	}
 	setVolume = function(vol) {
-		console.log("android: set vol=" + vol);
-		Android.playbackSetVolume(vol);
+		//console.log("android: set vol=" + Math.round(vol*100) + "%");
+		Android.playbackSetVolume("" + Math.round(vol*100));
 	}
-	
+
 } else {
 	audioElement = document.createElement('audio');
 

@@ -11,3 +11,9 @@ var isCordovaApp = document.URL.indexOf('http://') === -1 && document.URL.indexO
 if (!isCordovaApp) {
 	registerServiceWorker();
 }
+
+/*window["isUpdateAvailable"].then(isAvailable => {
+	if (isAvailable) {
+		console.log("refresh to get new content");
+	}
+});*/

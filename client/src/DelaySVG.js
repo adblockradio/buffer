@@ -57,11 +57,10 @@ class DelaySVG extends Component {
 					default: colorClass[i] = colors.GREY;
 				}
 				xStartClass[i] = Math.max(this.delayToX(this.props.width, +this.props.date-cl.validFrom), 0);
-				xStopClass[i] = Math.min(xStartClass[i], this.delayToX(this.props.width, cl.validTo ? (+this.props.date-cl.validTo) : 0));
+				xStopClass[i] = Math.max(xStartClass[i], this.delayToX(this.props.width, cl.validTo ? (+this.props.date-cl.validTo) : 0));
 				//ctx.fillRect(xStart, 0.6*height, xStop, height);
 			}
 		}
-
 
 		var nLines = Math.floor(this.props.cacheLen/TICKS_INTERVAL*1000)
 		var xLines = new Array(nLines);
@@ -79,7 +78,7 @@ class DelaySVG extends Component {
 			Math.round(cursorX-0.3*height) + ",0";
 
 		return (
-			<svg width={this.props.width} height={height + "px"} onClick={self.getCursorPosition} ref="canvas">
+			<svg width={this.props.width} height={height + "px"} onClick={self.getCursorPosition} ref="canvas" style={{marginTop: "10px"}}>
 
 				{!isNaN(cursorX) &&
 					<rect x={0} y={0} width={cursorX} height={this.props.classList ? 0.4*height : height} style={{fill: this.props.playing ? colors.LIGHT_PINK : colors.LIGHT_GREY}} />
@@ -91,10 +90,8 @@ class DelaySVG extends Component {
 					)
 				})}
 				{xLines.map(function(x, i) {
-					return (
-						x >= 0 &&
-							<line x1={x} y1={0} x2={x} y2={height} style={ticksStyle} key={"l" + i} />
-					)
+					if (x < 0) return null
+					return <line x1={x} y1={0} x2={x} y2={height} style={ticksStyle} key={"l" + i} />
 				})}
 
 				{!isNaN(cursorX) &&

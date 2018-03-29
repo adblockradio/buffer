@@ -25,6 +25,7 @@ import iconConfig from "./img/ads_135894.svg";
 import playing from "./img/playing.gif";
 
 /* global cordova */
+/* global Android */
 
 
 var DELAYS = {
@@ -53,6 +54,7 @@ class App extends Component {
 			configEditMode: false,
 			locale: "fr",
 			stopUpdates: false,
+			communicationError: false,
 			//doVisualUpdates: true
 			isCordovaApp: document.URL.indexOf('http://') === -1 && document.URL.indexOf('https://') === -1,
 			isAndroidApp: navigator.userAgent === "abr_android"
@@ -94,29 +96,34 @@ class App extends Component {
 			self.newTickInterval(document.hidden ? DELAYS.VISUALS_HIDDEN : DELAYS.VISUALS_ACTIVE);
 		});
 
+		var onHop = function (notification, eopts) {
+			if (self.state.config.radios.length > 1) {
+				var index = self.getRadioIndex(self.state.playingRadio);
+				var newIndex = (index + 1) % self.state.config.radios.length;
+				var newRadio = self.state.config.radios[newIndex].country + "_" + self.state.config.radios[newIndex].name;
+				self.play(newRadio, null, function() {});
+				console.log("notification: next channel");
+			} else {
+				console.log("notification: next channel but not possible");
+			}
+		};
+
+		var onStop = function (notification, eopts) {
+			console.log("notification: stop playback");
+			self.play(null, null, function() {});
+		};
+
 		if (this.state.isCordovaApp) { // set up notifications actions callbacks
 			document.addEventListener("deviceready", function(){
 				self.setState({ isCordovaDeviceReady: true });
-
-				var onHop = function (notification, eopts) {
-					if (self.state.config.radios.length > 1) {
-						var index = self.getRadioIndex(self.state.playingRadio);
-						var newIndex = (index + 1) % self.state.config.radios.length;
-						var newRadio = self.state.config.radios[newIndex].country + "_" + self.state.config.radios[newIndex].name;
-						self.play(newRadio, null, function() {});
-						console.log("notification: next channel");
-					} else {
-						console.log("notification: next channel but not possible");
-					}
-				};
 				cordova.plugins.notification.local.on('hop', onHop);
-
-				var onStop = function (notification, eopts) {
-					console.log("notification: stop playback");
-					self.play(null, null, function() {});
-				};
 				cordova.plugins.notification.local.on('stop', onStop);
 			});
+		} else if (this.state.isAndroidApp) {
+			window.notificationHop = onHop;
+			window.notificationHop = window.notificationHop.bind(this);
+			window.notificationStop = onStop;
+			window.notificationStop = window.notificationStop.bind(this);
 		}
 	}
 
@@ -138,9 +145,14 @@ class App extends Component {
 
 		//console.log("refresh status");
 		var self = this;
-		refreshStatus(this.state.config.radios, options, function(resParsed) {
+		refreshStatus(this.state.config.radios, options, function(err, resParsed) {
+			if (err) {
+				self.play(null, null, function() {});
+				return self.setState({ communicationError: true });
+			}
+
 			//console.log("refresh status callback");
-			var stateChange = {};
+			var stateChange = { communicationError: false };
 			var types = ["class", "metadata", "volume"];
 			for (var i=0; i<resParsed.length; i++) { // for each radio
 				var radio = resParsed[i].country + "_" + resParsed[i].name;
@@ -182,7 +194,7 @@ class App extends Component {
 			}
 
 			self.setState(stateChange, function() {
-				self.cordovaNotification();
+				self.showNotification();
 			});
 		});
 	}
@@ -419,6 +431,11 @@ class App extends Component {
 
 	}
 
+	showNotification() {
+		if (this.state.isCordovaApp) return this.cordovaNotification();
+		if (this.state.isAndroidApp) return this.androidNotification();
+	}
+
 	cordovaNotification() {
 		if (!this.state.isCordovaApp || !this.state.isCordovaDeviceReady) return
 
@@ -460,6 +477,25 @@ class App extends Component {
 		}
 	}
 
+	androidNotification() {
+		if (this.state.playingRadio) {
+			var index = this.getRadioIndex(this.state.playingRadio);
+			var name = this.state.config.radios[index].name;
+			var lang = this.state.locale;
+			var meta = this.getCurrentMetaForRadio(this.state.playingRadio);
+			var hasMeta = !!meta.text;
+			var notifTitle = hasMeta ? name : 'Adblock Radio';
+			var notifText = hasMeta ? meta.text : name;
+			var actions = [	{ id: 'stop',  title: { en: "Stop", fr: "Stop" }[lang] } ];
+			if (this.state.config.radios.length > 1) {
+				actions.unshift({ id: 'hop', title: { en: "Change channel", fr: "Changer de station"}[lang] });
+			}
+			Android.showNotification(notifTitle, notifText, actions);
+		} else {
+			Android.clearNotification();
+		}
+	}
+
 	play(radio, delay, callback) {
 		if (radio || delay) {
 			radio = radio || this.state.playingRadio;
@@ -479,7 +515,7 @@ class App extends Component {
 			stateChange["playingRadio"] = radio;
 			stateChange["playingDelay"] = delay;
 			this.setState(stateChange, function() {
-				this.cordovaNotification();
+				this.showNotification();
 			});
 
 			document.title = radio.split("_")[1] + " - Adblock Radio";
@@ -496,7 +532,7 @@ class App extends Component {
 				playingRadio: null,
 				playingDelay: null
 			}, function() {
-				this.cordovaNotification();
+				this.showNotification();
 			});
 			document.title = "Adblock Radio";
 			stop();
@@ -564,7 +600,7 @@ class App extends Component {
 			return (
 				<SoloMessage>
 					<p>{{ en: "Oops, could not connect to server :(", fr: "Oops, problème de connexion au serveur :(" }[lang]}</p>
-					<p>{{ en: "Restart it then press reload this page", fr: "Redémarrez-le puis rechargez cette page" }[lang]}</p>
+					<p>{{ en: "Check your subscription is active then reload this page", fr: "Vérifiez que vous êtes toujours abonné puis rechargez cette page" }[lang]}</p>
 				</SoloMessage>
 			)
 		}
@@ -631,6 +667,11 @@ class App extends Component {
 		} else {
 			mainContents = (
 				<RadioList>
+					{self.state.communicationError &&
+						<SoloMessage>
+							<p>{{ en: "The communication with the server is temporarily unavailable…", fr: "La connection au serveur est momentanément interrompue…" }[lang]}</p>
+						</SoloMessage>
+					}
 					{config.radios.map(function(radioObj, i) {
 						var radio = radioObj.country + "_" + radioObj.name;
 						var playing = self.state.playingRadio === radio;

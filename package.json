@@ -12,14 +12,15 @@
     "adblockradio-dl": "./adblockradio-dl",
     "adblockradio-sdk": "git://github.com/dest4/adblockradio-sdk.git#master",
     "async": "^2.6.0",
-    "chalk": "^2.3.0",
-    "jsonwebtoken": "^8.1.1",
-    "loglevel": "^1.6.1",
-    "loglevel-plugin-prefix": "^0.8.3",
-    "moment": "^2.20.1",
-    "webradio-metadata": "0.1.x"
+    "chalk": "^2.3.2",
+    "express": "^4.16.3",
+    "jsonwebtoken": "^8.2.0",
+    "moment": "^2.21.0",
+    "webradio-metadata": "^0.1.x",
+    "winston": "^3.0.0-rc3",
+    "winston-daily-rotate-file": "^3.0.1"
   },
   "devDependencies": {
-    "eslint": "^4.15.0"
+    "eslint": "^4.19.1"
   }
 }
