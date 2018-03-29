@@ -5,10 +5,9 @@
 
 const { log, flushLog } = require("./log.js")("master");
 const cp = require("child_process");
-const findDataFiles = require("./findDataFiles.js");
 const DlFactory = require("./DlFactory.js");
-const abrsdk = require("adblockradio-sdk")(require("./log.js")("sdk").log);
-//const abrsdk = require("../adblockradio-sdk/libabr.js")(require("./log.js")("sdk").log);
+//const abrsdk = require("adblockradio-sdk")(require("./log.js")("sdk").log);
+const abrsdk = require("../adblockradio-sdk/libabr.js")(require("./log.js")("sdk(local)").log);
 
 const FETCH_METADATA = true;
 const SAVE_AUDIO = false;
@@ -75,7 +74,20 @@ var updateDlList = function(forcePlaylistUpdate) {
 				} else {
 					log.debug("abrsdk: playlist successfully updated");
 				}
+				var lastPrediction = new Date();
+
+				setInterval(function() {
+					let age = +new Date() - lastPrediction;
+					if (age > 15000) {
+						log.warn("abrsdk: last prediction received " + Math.round(age/1000) + "s ago");
+					}
+				}, 5000);
+
 				abrsdk.setPredictionCallback(function(predictions) {
+					let age = +new Date() - lastPrediction;
+					if (age > 15000) log.warn("abrsdk: received prediction after a blackout of " + Math.round(age/1000) + "s");
+					lastPrediction = new Date();
+
 					var status, volume;
 					for (var i=0; i<predictions.radios.length; i++) {
 						switch (predictions.status[i]) {
