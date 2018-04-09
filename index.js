@@ -6,8 +6,8 @@
 const { log, flushLog } = require("./log.js")("master");
 const cp = require("child_process");
 const DlFactory = require("./DlFactory.js");
-//const abrsdk = require("adblockradio-sdk")(require("./log.js")("sdk").log);
-const abrsdk = require("../adblockradio-sdk/libabr.js")(require("./log.js")("sdk(local)").log);
+const abrsdk = require("adblockradio-sdk")(require("./log.js")("sdk").log);
+//const abrsdk = require("../adblockradio-sdk/libabr.js")(require("./log.js")("sdk(local)").log);
 
 const FETCH_METADATA = true;
 const SAVE_AUDIO = false;
@@ -18,6 +18,8 @@ var USE_ABRSDK = true;
 var { config, getRadios, getUserConfig, insertRadio, removeRadio, toggleContent, getAvailableInactive } = require("./config.js");
 
 var dl = [];
+var lastPrediction = new Date();
+
 var updateDlList = function(forcePlaylistUpdate) {
 	var playlistChange = false || !!forcePlaylistUpdate;
 
@@ -65,6 +67,16 @@ var updateDlList = function(forcePlaylistUpdate) {
 		for (var i=0; i<config.radios.length; i++) {
 			playlistArray.push(config.radios[i].country + "_" + config.radios[i].name);
 		}
+
+		var predInterval = setInterval(function() {
+			let age = +new Date() - lastPrediction;
+			if (age > 15000) {
+				log.warn("abrsdk: last prediction received " + Math.round(age/1000) + "s ago");
+				clearInterval(predInterval);
+				updateDlList(true);
+			}
+		}, 5000);
+
 		abrsdk.sendPlaylist(playlistArray, config.user.token, function(err, validatedPlaylist) {
 			if (err) {
 				log.warn("abrsdk: sendPlaylist error = " + err);
@@ -74,14 +86,6 @@ var updateDlList = function(forcePlaylistUpdate) {
 				} else {
 					log.debug("abrsdk: playlist successfully updated");
 				}
-				var lastPrediction = new Date();
-
-				setInterval(function() {
-					let age = +new Date() - lastPrediction;
-					if (age > 15000) {
-						log.warn("abrsdk: last prediction received " + Math.round(age/1000) + "s ago");
-					}
-				}, 5000);
 
 				abrsdk.setPredictionCallback(function(predictions) {
 					let age = +new Date() - lastPrediction;

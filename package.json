@@ -16,7 +16,7 @@
     "express": "^4.16.3",
     "jsonwebtoken": "^8.2.0",
     "moment": "^2.21.0",
-    "webradio-metadata": "^0.1.x",
+    "webradio-metadata": "^0.1.15",
     "winston": "^3.0.0-rc3",
     "winston-daily-rotate-file": "^3.0.1"
   },
