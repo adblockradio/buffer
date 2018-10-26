@@ -115,6 +115,14 @@ exports.getRadios = function() {
 	return radios;
 }
 
+exports.getRadio = function(country, name) {
+	// function to get the object config.radios[j] with matching country and name.
+	// can be used with both parameters or with the first one only, with the format COUNTRY + '_' + NAME.
+	const result = config.radios.filter(function(r) {
+		return (r.country === country && r.name === name) || (r.country + '_' + r.name === name);
+	});
+	return result ? result[0] : null;
+}
 
 var getUserConfig = function() {
 	var result = {};
@@ -133,7 +141,7 @@ exports.getUserConfig = getUserConfig;
 
 var saveRadios = function() {
 	var exportedRadios = exports.getRadios();
-	fs.writeFile("config/radios.json", JSON.stringify(exportedRadios), function(err) {
+	fs.writeFile("config/radios.json", JSON.stringify(exportedRadios, null, '\t'), function(err) {
 		if (err) {
 			log.error("saveRadios: could not save radio config. err=" + err);
 		} else {
