@@ -1,17 +1,30 @@
 "use strict";
 
-var { log } = require("./log.js")("config");
-var fs = require("fs");
-var { getRadioMetadata } = require("adblockradio-dl");
-var { getAvailable } = require("webradio-metadata");
-var jwt = require("jsonwebtoken");
+const { log } = require("abr-log")("config");
+const fs = require("fs");
+const { getRadioMetadata } = require("stream-tireless-baler");
+//const { getAvailable } = require("webradio-metadata");
+const jwt = require("jsonwebtoken");
+const axios = require("axios");
 
 
 // list of listened radios:
 var config = new Object();
 try {
-	var radiosText = fs.readFileSync("config/radios.json");
-	config.radios = JSON.parse(radiosText);
+	try {
+		var radiosText = fs.readFileSync("config/radios.json");
+		config.radios = JSON.parse(radiosText);
+	} catch (e) {
+		config.radios = [];
+		log.warn("could not load radio playlist (this is fine on first startup)");
+	}
+	try {
+		var availableText = fs.readFileSync("config/available.json");
+		config.available = JSON.parse(availableText);
+	} catch (e) {
+		config.available = [];
+		log.warn("could not load list of available radios (this is fine on first startup)");
+	}
 	var userText = fs.readFileSync("config/user.json");
 	config.user = JSON.parse(userText);
 	if (config.user.token) {
@@ -24,12 +37,14 @@ try {
 	} else {
 		config.user.email = "";
 	}
-
-} catch(e) {
+	//log.info("load config with radios " + config.radios.map(r => r.country + "_" + r.name).join(" "));
+} catch (e) {
 	return log.error("cannot load config. err=" + e);
 }
 
 exports.config = config;
+
+const { updateDlList } = require("./cache");
 
 var isRadioInConfig = function(country, name) {
 	var isAlreadyThere = false;
@@ -100,16 +115,16 @@ exports.toggleContent = function(country, name, type, enable, callback) {
 }
 
 exports.getRadios = function() {
-	var radios = [];
-	for (var i=0; i<config.radios.length; i++) { // control on what data is exposed via the api
-		var radio = config.radios[i];
+	let radios = [];
+	for (let i=0; i<config.radios.length; i++) { // control on what data is exposed via the api
+		const radio = config.radios[i];
 		radios.push({
 			country: radio.country,
 			name: radio.name,
 			content: radio.content,
-			url: radio.enabled,
+			url: radio.enabled, // TODO duh?
 			favicon: radio.favicon,
-			codec: radio.codec
+			codec: radio.codec,
 		});
 	}
 	return radios;
@@ -148,10 +163,59 @@ var saveRadios = function() {
 			log.debug("saveRadios: config saved");
 		}
 	});
+
+	// refresh the list of monitored radios
+	updateDlList();
 }
 
-var getAvailableInactive = function() {
-	var available = getAvailable();
+//updateDlList();
+
+// function that calls an API to get metadata about a radio
+/*const getRadioMetadata = async function(country, name) {
+	try {
+		const API_PATH = "http://www.radio-browser.info/webservice/json/stations/bynameexact/";
+		const result = await fetch(API_PATH + encodeURIComponent(name));
+		const results = JSON.parse(result);
+		const i = results.map(e => e.country).indexOf(country);
+
+		if (i >= 0) return results[i];
+		log.error("getRadioMetadata: radio not found: " + results);
+		return null;
+	} catch (e) {
+		log.warn("Could not get metadata for radio " + country + "_" + name + ". err=" + e);
+		return null;
+	}
+}*/
+
+const saveAvailable = function() {
+	fs.writeFile("config/available.json", JSON.stringify(config.available, null, '\t'), function(err) {
+		if (err) {
+			log.error("saveRadios: could not save available radios config. err=" + err);
+		} else {
+			log.debug("saveRadios: list of available radios saved");
+		}
+	});
+}
+
+const getAvailable = async function() {
+	// fetch the list of available models on remote model repo
+	const path = config.user.modelRepo + "list.json";
+	try {
+		const req = await axios.get(path);
+		config.available = req.data;
+	} catch (e) {
+		log.warn('could not get list of available radios at path ' + path + '. e=' + e);
+	}
+	saveAvailable();
+}
+
+getAvailable();
+setInterval(getAvailable, 1000 * 60 * 60); // refresh every hour
+
+const getAvailableInactive = function() {
+
+	let available = config.available.slice();
+
 	// remove radios that are currently in playlist
 	for (let i=available.length-1; i>=0; i--) {
 		let itemInPlaylist = false;

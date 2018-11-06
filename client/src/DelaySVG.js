@@ -51,9 +51,9 @@ class DelaySVG extends Component {
 			for (var i=nClasses; i>=0; i--) {
 				var cl = this.props.classList[i];
 				switch (cl.payload) {
-					case "AD": colorClass[i] = colors.RED; break;
-					case "SPEECH": colorClass[i] = colors.GREEN; break;
-					case "MUSIC": colorClass[i] = colors.BLUE; break;
+					case "0-ads": colorClass[i] = colors.RED; break;
+					case "1-speech": colorClass[i] = colors.GREEN; break;
+					case "2-music": colorClass[i] = colors.BLUE; break;
 					default: colorClass[i] = colors.GREY;
 				}
 				xStartClass[i] = Math.max(this.delayToX(this.props.width, +this.props.date-cl.validFrom), 0);

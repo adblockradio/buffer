@@ -1,5 +1,5 @@
 const { log } = require('abr-log')('listen');
-const { config } = require('../handlers/config');
+const { config, getRadio } = require('../handlers/config');
 
 
 var listenRequestDate = null;
@@ -26,10 +26,11 @@ var getDeviceInfoExpress = function(request) {
 }
 
 module.exports = (app) => app.get('/listen/:radio/:delay', function(request, response) {
-	var radio = decodeURIComponent(request.params.radio);
-	var delay = request.params.delay;
+	const radio = decodeURIComponent(request.params.radio);
+	const delay = request.params.delay;
 
-	if (!getRadio(radio)) {
+	const radioObj = getRadio(...radio.split("_"));
+	if (!radioObj) {
 		response.writeHead(400);
 		return response.end("radio not found");
 	}
@@ -44,7 +45,6 @@ module.exports = (app) => app.get('/listen/:radio/:delay', function(request, res
 	listenRequestDate = state.requestDate;
 	lastQueryRandomNum = queryRandomNum;
 
-	var radioObj = getRadio(radio);
 	var initialBuffer = radioObj.liveStatus.audioCache.readLast(+delay+config.user.streamInitialBuffer,config.user.streamInitialBuffer);
 	//log.debug("listen: readCursor set to " + radioObj.liveStatus.audioCache.readCursor);
 

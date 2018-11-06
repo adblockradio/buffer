@@ -3,22 +3,28 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "async": "^2.6.0",
-    "classnames": "^2.2.5",
-    "moment": "^2.20.1",
-    "rc-checkbox": "^2.1.4",
-    "react": "^16.1.1",
-    "react-dom": "^16.1.1",
-    "styled-components": "^2.4.0"
+    "async": "^2.6.1",
+    "classnames": "^2.2.6",
+    "moment": "^2.22.2",
+    "rc-checkbox": "^2.1.5",
+    "react": "^16.6.0",
+    "react-dom": "^16.6.0",
+    "styled-components": "^2.4.1"
   },
   "devDependencies": {
-    "react-scripts": "1.0.17"
+    "react-scripts": "2.1.1"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "PORT=9820 react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject"
   },
-  "homepage": "."
+  "homepage": "./player",
+  "browserslist": [
+    ">0.2%",
+    "not dead",
+    "not ie <= 11",
+    "not op_mini all"
+  ]
 }

@@ -1,0 +1,35 @@
+<html>
+<body>
+	Media debug page
+
+	<a href="#" id="test">TEST</a>
+	<script>
+		var audioElement = document.createElement('audio');
+
+		var play = function(url, callback) { // https://developers.google.com/web/updates/2017/06/play-request-was-interrupted
+			console.log("play " + url);
+			audioElement.src = url;
+			//var playPromise =
+			audioElement.play();
+			/*if (playPromise !== undefined) {
+				playPromise.then(_ => {
+					if (callback) callback(null);
+				})
+				.catch(error => {
+					if (callback) callback(error);
+				});
+			}*/
+			callback();
+		}
+
+		var startPlay = function() {
+			play("http://192.168.0.28:9820/listen/France_RTL/0?t=" + Math.round(1000000*Math.random()), function(err) {
+				if (err) console.log("play err=" + err);
+			});
+		}
+
+		document.getElementById("test").addEventListener("mousedown", startPlay);
+
+	</script>
+
+</html>

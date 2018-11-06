@@ -1,22 +1,33 @@
 'use strict';
 
 const { log } = require('abr-log')('cache');
-const { Analyser } = require("../adblockradio/post-processing.js");
+const { Writable } = require("stream");
+const { Analyser } = require("../../adblockradio/post-processing.js");
 const { config } = require('./config');
-var dl = [];
-var lastPrediction = new Date();
-
 
 class AudioCache extends Writable {
 	constructor(options) {
 		super();
 		this.cacheLen = options.cacheLen;
-		this.bitrate = options.bitrate;
-		this.bitrateValidated = false;
+		this.bitrate = 16000; // bytes per second. default value, to be updated later
 		this.flushAmount = 60 * this.bitrate;
 		this.readCursor = null;
 		this.buffer = Buffer.allocUnsafe(this.cacheLen * this.bitrate + 2*this.flushAmount).fill(0);
 		this.writeCursor = 0;
+	}
+
+	setBitrate(bitrate) {
+		if (!isNaN(bitrate) && bitrate > 0 && this.bitrate != bitrate) {
+			log.info("AudioCache: bitrate adjusted from " + this.bitrate + "bps to " + bitrate + "bps");
+
+			// if bitrate is higher than expected, expand the buffer accordingly.
+			if (bitrate > this.bitrate) {
+				var expandBuf = Buffer.allocUnsafe(this.cacheLen * (bitrate - this.bitrate)).fill(0);
+				log.info("AudioCache: buffer expanded from " + this.buffer.length + " to " + (this.buffer.length + expandBuf.length) + " bytes");
+				this.buffer = Buffer.concat([ this.buffer, expandBuf ]);
+			}
+			this.bitrate = bitrate;
+		}
 	}
 
 	_write(data, enc, next) {
@@ -27,23 +38,6 @@ class AudioCache extends Writable {
 		this.writeCursor += data.length;
 
 		//log.debug("AudioCache: _write: add " + data.length + " to buffer, new len=" + this.buffer.length);
-		if (this.writeCursor >= this.flushAmount && !this.bitrateValidated) {
-			var self = this;
-			this.evalBitrate(this.buffer, function(bitrate) {
-				if (!isNaN(bitrate) && bitrate > 0 && self.bitrate != bitrate) {
-					log.info("AudioCache: bitrate adjusted from " + self.bitrate + "bps to " + bitrate + "bps");
-
-					// if bitrate is higher than expected, expand the buffer accordingly.
-					if (bitrate > self.bitrate) {
-						var expandBuf = Buffer.allocUnsafe(self.cacheLen * (bitrate - self.bitrate)).fill(0);
-						log.info("AudioCache: buffer expanded from " + self.buffer.length + " to " + (self.buffer.length + expandBuf.length) + " bytes");
-						self.buffer = Buffer.concat([ self.buffer, expandBuf ]);
-					}
-					self.bitrate = bitrate;
-				}
-			});
-			this.bitrateValidated = true;
-		}
 
 		if (this.writeCursor >= this.cacheLen * this.bitrate + this.flushAmount) {
 			//log.debug("AudioCache: _write: cutting buffer at len = " + this.cacheLen * this.bitrate);
@@ -111,6 +105,9 @@ class MetaCache extends Writable {
 		if (!meta.type) {
 			log.error("MetaCache: no data type");
 			return next();
+		} else if (!meta.payload) {
+			log.warn("MetaCache: empty " + meta.type + " payload");
+			return next();
 		} else if (meta.validFrom > meta.validTo) {
 			log.error("MetaCache: negative time window validFrom=" + meta.validFrom + " validTo=" + meta.validTo);
 			return next();
@@ -143,12 +140,15 @@ class MetaCache extends Writable {
 			case "metadata":
 			case "class":
 			case "volume":
-				if (!this.meta[meta.type]) {
+				const curMeta = this.meta[meta.type];
+				//log.debug("MetaCache: curMeta=" + JSON.stringify(curMeta));
+				if (!curMeta) {
 					this.meta[meta.type] = [ { validFrom: meta.validFrom, validTo: meta.validTo, payload: meta.payload } ];
 				} else {
 					var samePayload = true;
+
 					for (var key in meta.payload) {
-						if ("" + meta.payload[key] && "" + meta.payload[key] !== "" + this.meta[meta.type][this.meta[meta.type].length-1].payload[key]) {
+						if ("" + meta.payload[key] && "" + meta.payload[key] !== "" + curMeta[curMeta.length-1].payload[key]) {
 							samePayload = false;
 							//log.debug("MetaCache: _write: different payload key=" + key + " new=" + meta.payload[key] + " vs old=" + this.meta[meta.type][this.meta[meta.type].length-1].payload[key]);
 							break;
@@ -223,13 +223,12 @@ class MetaCache extends Writable {
 }
 
 
-const addRadio = function(country, name) {
+const startMonitoring = function(country, name) {
 	const abr = new Analyser({
 		country: country,
 		name: name,
 		config: {
-			predInterval: 2,
-			saveDuration: 5,
+			predInterval: config.user.streamGranularity,
 			enablePredictorHotlist: true,
 			enablePredictorMl: true,
 			saveAudio: false,
@@ -239,38 +238,48 @@ const addRadio = function(country, name) {
 		}
 	});
 
-	abr.audioCache = new AudioCache({ bitrate: options.bitrate, cacheLen: config.user.cacheLen });
-	abr.metaCache = new MetaCache({ cacheLen: config.user.cacheLen });
+	const audioCache = new AudioCache({ cacheLen: config.user.cacheLen });
+	const metaCache = new MetaCache({ cacheLen: config.user.cacheLen });
 
 	abr.on("data", function(obj) {
 		//obj.liveResult.audio = "[redacted]";
+		obj = obj.liveResult;
 		//log.info("status=" + JSON.stringify(Object.assign(obj, { audio: undefined }), null, "\t"));
 
-		db.audioCache.write(dataObj.data);
+		audioCache.setBitrate(obj.bitrate);
+		if (obj.audio) audioCache.write(obj.audio);
 		// todo update bitrate here. set audioCache in Object mode
 
 		const now = +new Date();
-		abr.metaCache.write({
+		const validFrom = now - 1000 * config.user.streamGranularity / 2;
+		const validTo   = now + 1000 * config.user.streamGranularity / 2;
+		metaCache.write({
 			type: "class",
-			validFrom: now-500*options.segDuration,
-			validTo: now+500*options.segDuration,
-			payload: className
+			validFrom: validFrom,
+			validTo: validTo,
+			payload: obj.class
 		});
-		abr.metaCache.write({
+		metaCache.write({
 			type: "volume",
-			validFrom: now-500*options.segDuration,
-			validTo: now+500*options.segDuration,
-			payload: volume
+			validFrom: validFrom,
+			validTo: validTo,
+			payload: obj.gain
 		});
-		abr.metaCache.write({
+		metaCache.write({
 			type: "metadata",
-			validFrom: now-500*options.segDuration,
-			validTo: now+500*options.segDuration,
-			payload: parsedMeta
+			validFrom: validFrom,
+			validTo: validTo,
+			payload: obj.metadata
 		});
 	});
 
-	dl.push(abr);
+	return {
+		predictor: abr,
+		audioCache: audioCache,
+		metaCache: metaCache,
+	}
+
+	//dl.push(abr);
 
 	/*dl.push(DlFactory(config.radios[i], {
 		fetchMetadata: FETCH_METADATA,
@@ -280,29 +289,8 @@ const addRadio = function(country, name) {
 	}));*/
 }
 
+exports.startMonitoring = startMonitoring;
 
-var updateDlList = function(forcePlaylistUpdate) {
-	//var playlistChange = false || !!forcePlaylistUpdate;
 
-	// add missing sockets
-	for (var i=0; i<config.radios.length; i++) {
-		const alreadyThere = config.radios.filter(r => r.country === dl[j].country && r.name === dl[j].name).length > 0;
-		if (!alreadyThere) {
-			config.radios[i].liveStatus = {};
-			log.info("updateDlList: start " + config.radios[i].country + "_" + config.radios[i].name);
-			addRadio(config.radios[i].country, config.radios[i].name);
-		}
-	}
 
-	// remove obsolete ones.
-	for (var j=dl.length-1; j>=0; j--) {
-		const shouldBeThere = config.radios.filter(r => r.country === dl[j].country && r.name === dl[j].name).length > 0;
-		if (!shouldBeThere) {
-			log.info("updateDlList: stop " + dl[j].country + "_" + dl[j].name);
-			dl[j].stopDl();
-			dl.splice(j, 1);
-		}
-	}
-}
-
-exports.updateDlList = updateDlList;
+//exports.updateDlList = updateDlList;

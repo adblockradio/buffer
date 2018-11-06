@@ -3,7 +3,6 @@
 import React, { Component } from "react";
 import PropTypes from "prop-types";
 import styled from "styled-components";
-import { load } from './load.js';
 import classNames from 'classnames';
 import 'rc-checkbox/assets/index.css';
 import defaultCover from "./img/default_radio_logo.svg";
@@ -31,29 +30,26 @@ class Playlist extends Component {
 		}
 	}
 
-	componentDidMount() {
-		let self = this;
-
-		load("config/radios/available?t=" + Math.round(Math.random()*1000000), function(err, res) {
-			if (err) {
-				return self.setState({ radiosLoaded: true, radiosError: true });
-			}
-			try {
-				var radios = JSON.parse(res);
-				self.setState({ radiosLoaded: true, radios: radios });
-			} catch(e) {
-				console.log("problem parsing JSON from server: " + e.message);
-				self.setState({ radiosLoaded: true, radiosError: true });
-			}
-		});
+	async componentDidMount() {
+		try {
+			const request = await fetch("config/radios/available?t=" + Math.round(Math.random()*1000000));
+			const res = await request.text();
+			var radios = JSON.parse(res);
+			this.setState({ radiosLoaded: true, radios: radios, radiosError: false });
+		} catch (e) {
+			console.log("problem getting available radios. err=" + e.message);
+			this.setState({ radiosLoaded: true, radiosError: true });
+		}
 	}
 
-	insert(country, name) {
-		this.props.insertRadio(country, name, this.componentDidMount);
+	async insert(country, name) {
+		await this.props.insertRadio(country, name);
+		this.componentDidMount();
 	}
 
-	remove(country, name) {
-		this.props.removeRadio(country, name, this.componentDidMount);
+	async remove(country, name) {
+		await this.props.removeRadio(country, name);
+		this.componentDidMount();
 	}
 
 	/*toggleContent(country, name, contentType, enabled) {
@@ -94,10 +90,10 @@ class Playlist extends Component {
 						<PlaylistItem className={classNames({ active: true })} key={"item" + i}>
 							<PlaylistItemTopRow>
 								<PlaylistItemLogo src={radio.favicon || defaultCover} alt="logo" />
-								<PlaylistItemText onClick={function() { self.remove(radio.country, radio.name); }}>
+								<PlaylistItemText onClick={() => self.remove(radio.country, radio.name)}>
 									{radio.name}
 								</PlaylistItemText>
-								<RemoveIcon src={removeIcon} onClick={function() { self.remove(radio.country, radio.name); }} />
+								<RemoveIcon src={removeIcon} onClick={() => self.remove(radio.country, radio.name)} />
 							</PlaylistItemTopRow>
 						</PlaylistItem>
 					)

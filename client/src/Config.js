@@ -10,10 +10,14 @@ import FlagContainer from "./Flag.js";
 import defaultCover from "./img/default_radio_logo.svg";
 import userIcon from "./img/user_1085539.svg";
 import { colorByType } from "./colors.js";
-import { HOST } from './load.js';
 
 
 class Config extends Component {
+
+	constructor() {
+		super();
+		this.toggleContent = this.toggleContent.bind(this);
+	}
 
 	translateContentName(type, lang) {
 		switch (type) {
@@ -24,10 +28,11 @@ class Config extends Component {
 		}
 	}
 
-	/*toggleContent(country, name, contentType, enabled) {
+	async toggleContent(country, name, contentType, enabled) {
 		console.log("toggleContent radio=" + country + "_" + name + " contentType=" + contentType + " enable=" + enabled);
-		this.props.toggleContent(country, name, contentType, enabled, this.componentDidMount);
-	}*/
+		await this.props.toggleContent(country, name, contentType, enabled);
+		this.componentDidMount();
+	}
 
 	render() {
 		var lang = this.props.locale;
@@ -70,7 +75,7 @@ class Config extends Component {
 										<PlaylistItemConfigItem key={"item" + i + "config" + j}>
 											<Checkbox
 												checked={!radio.content[type] && !!self.props.config.user.email}
-												onChange={(e) => self.props.toggleContent(radio.country, radio.name, type, !e.target.checked, self.componentDidMount)}
+												onChange={(e) => self.toggleContent(radio.country, radio.name, type, !e.target.checked)}
 												disabled={!self.props.config.user.email}
 											/>
 											&nbsp; {{ en: "skip " + self.translateContentName(type, lang), fr: "zapper les " + self.translateContentName(type, lang) }[lang]}
@@ -97,7 +102,6 @@ class Config extends Component {
 							);
 						})}
 					</ChoiceL10nContainer>
-					<PreferencesItemTitle>{{ en: "Server path:", fr: "Serveur :"}[lang] + " " + HOST}</PreferencesItemTitle>
 
 					<PreferencesItemTitle>{{ en: "Connected to Adblock Radio as:", fr: "Connecté à Adblock Radio en tant que :"}[lang]}</PreferencesItemTitle>
 					{loggedAs &&
