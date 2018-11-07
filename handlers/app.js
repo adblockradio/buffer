@@ -28,4 +28,14 @@ if (DEV) {
 	app.use('/', express.static('client/build'));
 }
 
+try {
+	require('../api/config')(app);
+	require('../api/content')(app);
+	require('../api/listen')(app);
+	require('../api/radios')(app);
+	require('../api/status')(app);
+} catch (e) {
+	log.warn('API error. e=' + e);
+}
+
 exports.app = app;

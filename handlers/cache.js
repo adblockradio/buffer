@@ -3,7 +3,6 @@
 const { log } = require('abr-log')('cache');
 const { Writable } = require("stream");
 const { Analyser } = require("../../adblockradio/post-processing.js");
-const { config } = require('./config');
 
 class AudioCache extends Writable {
 	constructor(options) {
@@ -223,7 +222,7 @@ class MetaCache extends Writable {
 }
 
 
-const startMonitoring = function(country, name) {
+const startMonitoring = function(country, name, config) {
 	const abr = new Analyser({
 		country: country,
 		name: name,
@@ -278,19 +277,33 @@ const startMonitoring = function(country, name) {
 		audioCache: audioCache,
 		metaCache: metaCache,
 	}
-
-	//dl.push(abr);
-
-	/*dl.push(DlFactory(config.radios[i], {
-		fetchMetadata: FETCH_METADATA,
-		segDuration: SEG_DURATION,
-		saveAudio: SAVE_AUDIO,
-		cacheLen: config.user.cacheLen + config.user.streamInitialBuffer
-	}));*/
 }
 
-exports.startMonitoring = startMonitoring;
+const updateDlList = function(config) {
+	log.info("refresh playlist");
 
+	const configList = config.radios.map(r => r.country + "_" + r.name);
+	const currentList = config.radios.filter(r => r.liveStatus).map(r =>  r.country + "_" + r.name);
 
+	// add missing monitors
+	for (var i=0; i<configList.length; i++) {
+		const alreadyThere = currentList.includes(configList[i]);
+		if (!alreadyThere) {
+			log.info("updateDlList: start " + config.radios[i].country + "_" + config.radios[i].name);
+			config.radios[i].liveStatus = startMonitoring(config.radios[i].country, config.radios[i].name, config);
+		}
+	}
 
-//exports.updateDlList = updateDlList;
+	// remove obsolete ones.
+	for (var j=currentList-1; j>=0; j--) {
+		const shouldBeThere = configList.includes(currentList[j]);
+		if (!shouldBeThere) {
+			log.info("updateDlList: stop " + dl[j].country + "_" + dl[j].name);
+			const obj = config.radios.filter(r => r.country + "_" + r.name === currentList[j])[0];
+			obj.predictor.stopDl();
+			delete obj.liveStatus;
+		}
+	}
+}
+
+exports.updateDlList = updateDlList;

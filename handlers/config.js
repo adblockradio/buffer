@@ -3,7 +3,6 @@
 const { log } = require("abr-log")("config");
 const fs = require("fs");
 const { getRadioMetadata } = require("stream-tireless-baler");
-//const { getAvailable } = require("webradio-metadata");
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
 
@@ -45,6 +44,9 @@ try {
 exports.config = config;
 
 const { updateDlList } = require("./cache");
+
+// start monitoring radios
+updateDlList(config);
 
 var isRadioInConfig = function(country, name) {
 	var isAlreadyThere = false;
@@ -165,10 +167,8 @@ var saveRadios = function() {
 	});
 
 	// refresh the list of monitored radios
-	updateDlList();
+	updateDlList(config);
 }
-
-//updateDlList();
 
 // function that calls an API to get metadata about a radio
 /*const getRadioMetadata = async function(country, name) {

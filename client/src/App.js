@@ -211,6 +211,8 @@ class App extends Component {
 		} catch (e) {
 			console.log("problem refreshing config from server: " + e);
 			this.setState({ configError: true, configLoaded: true });
+			clearInterval(this.timerID);
+			clearInterval(this.metadataTimerID);
 		}
 		if (callback) callback();
 	}
