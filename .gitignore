@@ -1,9 +1,8 @@
-adblockradio-dl/
+config/available.json
 config/radios.json
 config/user.json
 records/
 node_modules/
 client/.htpasswd
 log/
-log.js
 error.log

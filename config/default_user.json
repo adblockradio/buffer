@@ -1,8 +1,9 @@
 {
-	"token": "",
 	"cacheLen": 900,
 	"streamInitialBuffer": 8,
-	"streamGranularity": 1,
+	"streamGranularity": 2,
 	"maxRadios": 3,
-	"discardSmallSegments": 20
+	"discardSmallSegments": 20,
+	"serverPort": 9820,
+	"modelRepo": "https://www.adblockradio.com/models/"
 }
