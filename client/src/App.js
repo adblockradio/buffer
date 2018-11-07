@@ -656,7 +656,7 @@ class App extends Component {
 		//console.log("Metadata props: date=" + (+this.state.date) + " clockDiff=" + this.state.clockDiff + " playingDelay=" + this.state.playingDelay);
 
 		let mainContents;
-		if (this.state.configEditMode || !config.user.email) {
+		if (this.state.configEditMode) {
 			mainContents = (
 				<Config config={this.state.config}
 					toggleContent={this.toggleContent}

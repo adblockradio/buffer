@@ -15,7 +15,7 @@
     "react-scripts": "2.1.1"
   },
   "scripts": {
-    "start": "PORT=9820 react-scripts start",
+    "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject"
