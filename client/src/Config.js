@@ -31,7 +31,6 @@ class Config extends Component {
 	async toggleContent(country, name, contentType, enabled) {
 		console.log("toggleContent radio=" + country + "_" + name + " contentType=" + contentType + " enable=" + enabled);
 		await this.props.toggleContent(country, name, contentType, enabled);
-		this.componentDidMount();
 	}
 
 	render() {
@@ -74,9 +73,9 @@ class Config extends Component {
 									return (
 										<PlaylistItemConfigItem key={"item" + i + "config" + j}>
 											<Checkbox
-												checked={!radio.content[type] && !!self.props.config.user.email}
+												checked={!radio.content[type]}
 												onChange={(e) => self.toggleContent(radio.country, radio.name, type, !e.target.checked)}
-												disabled={!self.props.config.user.email}
+												disabled={false}
 											/>
 											&nbsp; {{ en: "skip " + self.translateContentName(type, lang), fr: "zapper les " + self.translateContentName(type, lang) }[lang]}
 										</PlaylistItemConfigItem>
