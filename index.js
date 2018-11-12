@@ -4,7 +4,13 @@
 "use strict";
 
 // load config and start monitoring radios
-require('./handlers/config');
+const Config = require('./handlers/config');
 
-// start http server and API endpoints
-require('./handlers/app');
+const isElectron = !!process.versions['electron']; // in a Electron environment (https://github.com/electron/electron/issues/2288)
+
+if (!isElectron) {
+	// start http server and API endpoints
+	require('./handlers/app');
+}
+
+module.exports = Config;

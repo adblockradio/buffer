@@ -3,6 +3,7 @@
 const { log } = require('abr-log')('cache');
 const { Writable } = require("stream");
 const { Analyser } = require("../../adblockradio/post-processing.js");
+const { config } = require('./config');
 
 class AudioCache extends Writable {
 	constructor(options) {
@@ -59,7 +60,7 @@ class AudioCache extends Writable {
 		} else if (duration > secondsFromEnd) {
 			log.error("AudioCache: readLast: duration=" + duration + " higher than secondsFromEnd=" + secondsFromEnd);
 			return null;
-		} else if (secondsFromEnd * this.bitrate >= l) {
+		} else if (secondsFromEnd * this.bitrate > l) {
 			log.error("AudioCache: readLast: attempted to read " + secondsFromEnd + " seconds (" + secondsFromEnd * this.bitrate + " b) while bufferLen=" + l);
 			return null;
 		}
@@ -89,7 +90,7 @@ class AudioCache extends Writable {
 	}
 
 	getAvailableCache() {
-		return this.buffer ? this.writeCursor / this.bitrate : 0;
+		return this.buffer ? Math.max(this.writeCursor / this.bitrate - config.user.streamInitialBuffer, 0) : 0;
 	}
 }
 
