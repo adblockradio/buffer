@@ -33,7 +33,7 @@ class DelaySVG extends Component {
 	}
 
 	delayToX(width, delay) {
-		return Math.round(width*(1-delay/1000/this.props.cacheLen));
+		return Math.round(width*(1-(this.props.cacheLen-this.props.availableCache+delay/1000)/this.props.cacheLen));
 	}
 
 	render() {
