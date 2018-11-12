@@ -38,7 +38,8 @@ try {
 	}
 	//log.info("load config with radios " + config.radios.map(r => r.country + "_" + r.name).join(" "));
 } catch (e) {
-	return log.error("cannot load config. err=" + e);
+	log.error("cannot load config. err=" + e);
+	process.exit(1);
 }
 
 exports.config = config;
@@ -233,3 +234,24 @@ const getAvailableInactive = function() {
 }
 
 exports.getAvailableInactive = getAvailableInactive;
+
+const gatherStatus = function(since) {
+	const result = [];
+	for (let i=0; i<config.radios.length; i++) {
+		const obj = {
+			country: config.radios[i].country,
+			name: config.radios[i].name
+		}
+		//var hasAvailable =
+		if (config.radios[i].liveStatus && config.radios[i].liveStatus.audioCache) {
+			Object.assign(obj, { available: Math.floor(config.radios[i].liveStatus.audioCache.getAvailableCache()-config.user.streamInitialBuffer) });
+		}
+		if (config.radios[i].liveStatus && config.radios[i].liveStatus.metaCache) {
+			Object.assign(obj, config.radios[i].liveStatus.metaCache.read(since));
+		}
+		result.push(obj);
+	}
+	return result;
+}
+
+exports.gatherStatus = gatherStatus;
