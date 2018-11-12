@@ -4,7 +4,12 @@
   "description": "Adblock Radio module to buffer radio stream data and deliver it to end user according to its listening preferences.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js",
+    "electron": "electron electron.js",
+    "postinstall": "electron-builder install-app-deps",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
   },
   "author": "Alexandre Storelli <a_npm@storelli.fr>",
   "license": "UNLICENSED",
@@ -19,6 +24,8 @@
     "webradio-metadata": "^0.1.31"
   },
   "devDependencies": {
+    "electron": "^3.0.8",
+    "electron-builder": "^20.34.0",
     "eslint": "^5.8.0"
   }
 }
