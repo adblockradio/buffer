@@ -17,7 +17,8 @@ class Playlist extends Component {
 		this.state = {
 			radiosLoaded: false,
 			radiosError: false,
-			radios: []
+			radios: [],
+			isElectron: navigator.userAgent.toLowerCase().indexOf(' electron/') > -1,
 		}
 	}
 
@@ -32,9 +33,13 @@ class Playlist extends Component {
 
 	async componentDidMount() {
 		try {
-			const request = await fetch("config/radios/available?t=" + Math.round(Math.random()*1000000));
-			const res = await request.text();
-			var radios = JSON.parse(res);
+			if (!this.state.isElectron) {
+				const request = await fetch("config/radios/available?t=" + Math.round(Math.random()*1000000));
+				const res = await request.text();
+				var radios = JSON.parse(res);
+			} else {
+				radios = navigator.abrserver.getAvailableInactive();
+			}
 			this.setState({ radiosLoaded: true, radios: radios, radiosError: false });
 		} catch (e) {
 			console.log("problem getting available radios. err=" + e.message);

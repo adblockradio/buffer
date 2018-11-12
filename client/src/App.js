@@ -27,15 +27,14 @@ import playing from "./img/playing.gif";
 /* global cordova */
 /* global Android */
 
-
-var DELAYS = {
+const DELAYS = {
 	FETCH_UPDATES_PLAYING: 2000,
 	FETCH_UPDATES_IDLE: 5000, // if higher than 10, need to update value in load.js
 	VISUALS_ACTIVE: 1000,
 	VISUALS_HIDDEN: 10000
 }
 
-var VOLUMES = {
+const VOLUMES = {
 	MUTED: 0.1,
 	DEFAULT: 0.5
 }
@@ -43,6 +42,7 @@ var VOLUMES = {
 class App extends Component {
 	constructor(props) {
 		super(props);
+		const isElectron = navigator.userAgent.toLowerCase().indexOf(' electron/') > -1; // in a Electron environment (https://github.com/electron/electron/issues/2288)
 		this.state = {
 			configLoaded: false,
 			configError: false,
@@ -55,8 +55,9 @@ class App extends Component {
 			locale: "fr",
 			stopUpdates: false,
 			communicationError: false,
-			//doVisualUpdates: true
-			isCordovaApp: document.URL.indexOf('http://') === -1 && document.URL.indexOf('https://') === -1,
+			//doVisualUpdates: true,
+			isElectron: isElectron,
+			isCordovaApp: document.URL.indexOf('http://') === -1 && document.URL.indexOf('https://') === -1 && !isElectron,
 			isAndroidApp: navigator.userAgent === "abr_android"
 		}
 		this.play = this.play.bind(this);
@@ -75,18 +76,20 @@ class App extends Component {
 
 	componentDidMount() {
 		var self = this;
-		if (this.state.isCordovaApp) {
-			console.log("detected cordova environment");
+		if (this.state.isElectron) {
+			console.log("detected Electron environment");
+		} else if (this.state.isCordovaApp) {
+			console.log("detected Cordova environment");
 			loadScript("./cordova.js", function() {
 				console.log("cordova script loaded");
 			});
 		} else if (this.state.isAndroidApp) {
-			console.log("detected android environment");
+			console.log("detected Android environment");
 		} else {
 			console.log("detected web environment");
 		}
 		this.refreshConfig(function() {
-			if (self.state.config.radios.length === 0) self.setState({ playlistEditMode: true });
+			if (self.state.config.radios && self.state.config.radios.length === 0) self.setState({ playlistEditMode: true });
 		});
 		this.newTickInterval(DELAYS.VISUALS_ACTIVE);
 
@@ -101,7 +104,7 @@ class App extends Component {
 				var index = self.getRadioIndex(self.state.playingRadio);
 				var newIndex = (index + 1) % self.state.config.radios.length;
 				var newRadio = self.state.config.radios[newIndex].country + "_" + self.state.config.radios[newIndex].name;
-				self.play(newRadio, null, function() {});
+				self.play(newRadio, null, null);
 				console.log("notification: next channel");
 			} else {
 				console.log("notification: next channel but not possible");
@@ -110,7 +113,7 @@ class App extends Component {
 
 		var onStop = function (notification, eopts) {
 			console.log("notification: stop playback");
-			self.play(null, null, function() {});
+			self.play(null, null, null);
 		};
 
 		if (this.state.isCordovaApp) { // set up notifications actions callbacks
@@ -203,9 +206,21 @@ class App extends Component {
 
 	async refreshConfig(callback) {
 		try {
-			const request = await fetch("config?t=" + Math.round(Math.random()*1000000));
-			const res = await request.text();
-			const config = JSON.parse(res);
+			if (!this.state.isElectron) {
+				const request = await fetch("config?t=" + Math.round(Math.random()*1000000));
+				const res = await request.text();
+				var config = JSON.parse(res);
+			} else {
+				/*await new Promise((resolve) => {
+					ipcRenderer.send('config', '');
+					ipcRenderer.once('config', (event, arg) => {
+						console.log(arg) // prints "pong"
+						config = JSON.parse(arg);
+						resolve();
+					});
+				});*/
+				config = { radios: navigator.abrserver.getRadios(), user: navigator.abrserver.getUserConfig() };
+			}
 			await this.setState({ config: config, configError: false, configLoaded: true });
 			this.newRefreshStatusInterval(DELAYS.FETCH_UPDATES_IDLE, true);
 		} catch (e) {
@@ -238,7 +253,7 @@ class App extends Component {
 					//res = { err: ... , delayChanged: ..., hasAcceptableContent: ... }
 					acceptableContent[iRadio] = res.hasAcceptableContent;
 					if (self.state.playingRadio === radioName && res.hasAcceptableContent && !res.delayChanged) {
-						self.setVolumeForRadio(radio);
+						self.setVolumeForRadio(radioName, VOLUMES.DEFAULT);
 						onCursorChecked();
 					} else if (self.state.playingRadio === radioName && res.hasAcceptableContent && res.delayChanged) {
 						// here, we know we are playing a channel with good content at the updated delay
@@ -250,6 +265,7 @@ class App extends Component {
 					}
 				});
 			}, function(err) {
+				if (err) console.log("tick err=" + err);
 				var iPlayingRadio = self.getRadioIndex(self.state.playingRadio);
 				// here, all cursors have been updated
 				//console.log("iPlayingRadio=" + iPlayingRadio + " acceptable=" + acceptableContent[iPlayingRadio]);
@@ -271,7 +287,7 @@ class App extends Component {
 				}
 				// as a last resort, turn down the volume
 				//if (DEBUG) console.log("no alt content to play, lower volume");
-				setVolume(VOLUMES.MUTED);
+				self.setVolumeForRadio(self.state.playingRadio, VOLUMES.MUTED);
 			});
 		});
 	}
@@ -391,8 +407,8 @@ class App extends Component {
 		return -1;
 	}
 
-	setVolumeForRadio(radio) {
-		let targetVolume = VOLUMES.DEFAULT;
+	setVolumeForRadio(radio, volume) {
+		let targetVolume = volume || VOLUMES.DEFAULT;
 		if (this.state[radio + "|volume"] && this.state[radio + "|volume"].length > 0) {
 			targetVolume = Math.pow(10, (Math.min(70-this.state[radio + "|volume"][0].payload,0))/20)
 		}
@@ -522,7 +538,7 @@ class App extends Component {
 				if (err) console.log("Play: error=" + err);
 				if (callback) callback(err);
 			});
-			this.setVolumeForRadio(radio);
+			this.setVolumeForRadio(radio, VOLUMES.DEFAULT);
 			this.newRefreshStatusInterval(DELAYS.FETCH_UPDATES_PLAYING, false);
 
 		} else {
@@ -564,7 +580,11 @@ class App extends Component {
 
 	async insertRadio(country, name) {
 		try {
-			await fetch("config/radios/" + encodeURIComponent(country) + "/" + encodeURIComponent(name) + "?t=" + Math.round(Math.random()*1000000), { method: "PUT" });
+			if (!this.state.isElectron) {
+				await fetch("config/radios/" + encodeURIComponent(country) + "/" + encodeURIComponent(name) + "?t=" + Math.round(Math.random()*1000000), { method: "PUT" });
+			} else {
+				await new Promise((resolve) => { navigator.abrserver.insertRadio(country, name, resolve) });
+			}
 			await this.refreshConfig();
 		} catch (e) {
 			console.log("could not insert radio " + country + "_" + name + ". err=" + e);
@@ -574,7 +594,11 @@ class App extends Component {
 	async removeRadio(country, name) {
 		if (this.state.playingRadio === country + "_" + name) this.play(null, null, function() {});
 		try {
-			await fetch("config/radios/" + encodeURIComponent(country) + "/" + encodeURIComponent(name) + "?t=" + Math.round(Math.random()*1000000), { method: "DELETE" });
+			if (!this.state.isElectron) {
+				await fetch("config/radios/" + encodeURIComponent(country) + "/" + encodeURIComponent(name) + "?t=" + Math.round(Math.random()*1000000), { method: "DELETE" });
+			} else {
+				await new Promise((resolve) => { navigator.abrserver.removeRadio(country, name, resolve) });
+			}
 			await this.refreshConfig();
 		} catch (e) {
 			console.log("could not remove radio " + country + "_" + name + ". err=" + e);
@@ -584,8 +608,12 @@ class App extends Component {
 	async toggleContent(country, name, contentType, enabled) {
 		try {
 			// /config/radios/:country/:name/content/:type/:enable
-			await fetch("config/radios/" + encodeURIComponent(country) + "/" + encodeURIComponent(name) + "/content/" +
-				encodeURIComponent(contentType) + "/" + (enabled ? "enable" : "disable") + "?t=" + Math.round(Math.random()*1000000), { method: "PUT" });
+			if (!this.state.isElectron) {
+				await fetch("config/radios/" + encodeURIComponent(country) + "/" + encodeURIComponent(name) + "/content/" +
+					encodeURIComponent(contentType) + "/" + (enabled ? "enable" : "disable") + "?t=" + Math.round(Math.random()*1000000), { method: "PUT" });
+			} else {
+				await new Promise((resolve) => { navigator.abrserver.toggleContent(country, name, contentType, (enabled ? "enable" : "disable"), resolve); });
+			}
 			await this.refreshConfig();
 		} catch (e) {
 			console.log("could not toggle content for radio " + country + "_" + name + " content=" + contentType + " enabled=" + enabled + " err=" + e);
@@ -606,7 +634,7 @@ class App extends Component {
 			return (
 				<SoloMessage>
 					<p>{{ en: "Oops, could not connect to server :(", fr: "Oops, problème de connexion au serveur :(" }[lang]}</p>
-					<p>{{ en: "Check your subscription is active then reload this page", fr: "Vérifiez que vous êtes toujours abonné puis rechargez cette page" }[lang]}</p>
+					<p>{{ en: "Check the server is running then reload this page", fr: "Vérifiez que le serveur est toujours actif puis rechargez cette page" }[lang]}</p>
 				</SoloMessage>
 			)
 		}
