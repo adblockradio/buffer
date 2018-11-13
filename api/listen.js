@@ -94,7 +94,7 @@ module.exports = (app) => app.get('/listen/:radio/:delay', function(request, res
 			log.warn("request canceled because another one has been initiated");
 			return finish();
 		}
-		var radioObj = getRadio(radio);
+		var radioObj = getRadio(...radio.split("_"));
 		if (!radioObj) {
 			log.error("/listen/" + radio + "/" + delay + ": radio not available");
 			return finish();

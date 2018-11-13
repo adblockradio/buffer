@@ -44,10 +44,13 @@ try {
 
 exports.config = config;
 
-const { updateDlList } = require("./cache");
+const { startMonitoring } = require("./cache");
 
 // start monitoring radios
-updateDlList(config);
+for (var i=0; i<config.radios.length; i++) {
+	log.info("start " + config.radios[i].country + "_" + config.radios[i].name);
+	config.radios[i].liveStatus = startMonitoring(config.radios[i].country, config.radios[i].name, config.user);
+}
 
 var isRadioInConfig = function(country, name) {
 	var isAlreadyThere = false;
@@ -80,6 +83,7 @@ exports.insertRadio = function(country, name, callback) {
 				url: radio.url,
 				codec: radio.codec,
 				favicon: radio.favicon,
+				liveStatus: startMonitoring(country, name, config.user),
 			});
 			//log.debug(JSON.stringify(config.radios[config.radios.length-1]));
 			saveRadios();
@@ -92,6 +96,7 @@ exports.removeRadio = function(country, name, callback) {
 
 	for (var i=0; i<config.radios.length; i++) {
 		if (config.radios[i].country == country && config.radios[i].name == name) {
+			config.radios[i].liveStatus.predictor.stopDl();
 			config.radios.splice(i, 1);
 			saveRadios();
 			return callback(null);
@@ -166,9 +171,6 @@ var saveRadios = function() {
 			log.debug("saveRadios: config saved");
 		}
 	});
-
-	// refresh the list of monitored radios
-	updateDlList(config);
 }
 
 // function that calls an API to get metadata about a radio

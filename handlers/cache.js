@@ -3,12 +3,15 @@
 const { log } = require('abr-log')('cache');
 const { Writable } = require("stream");
 const { Analyser } = require("../../adblockradio/post-processing.js");
-const { config } = require('./config');
+
+const UNSURE = "unsure";
 
 class AudioCache extends Writable {
 	constructor(options) {
 		super();
+		this.canonical = options.canonical;
 		this.cacheLen = options.cacheLen;
+		this.streamInitialBuffer = options.streamInitialBuffer;
 		this.bitrate = 16000; // bytes per second. default value, to be updated later
 		this.flushAmount = 60 * this.bitrate;
 		this.readCursor = null;
@@ -18,12 +21,12 @@ class AudioCache extends Writable {
 
 	setBitrate(bitrate) {
 		if (!isNaN(bitrate) && bitrate > 0 && this.bitrate != bitrate) {
-			log.info("AudioCache: bitrate adjusted from " + this.bitrate + "bps to " + bitrate + "bps");
+			log.info(this.canonical + " AudioCache: bitrate adjusted from " + this.bitrate + "bps to " + bitrate + "bps");
 
 			// if bitrate is higher than expected, expand the buffer accordingly.
 			if (bitrate > this.bitrate) {
 				var expandBuf = Buffer.allocUnsafe(this.cacheLen * (bitrate - this.bitrate)).fill(0);
-				log.info("AudioCache: buffer expanded from " + this.buffer.length + " to " + (this.buffer.length + expandBuf.length) + " bytes");
+				log.info(this.canonical + " AudioCache: buffer expanded from " + this.buffer.length + " to " + (this.buffer.length + expandBuf.length) + " bytes");
 				this.buffer = Buffer.concat([ this.buffer, expandBuf ]);
 			}
 			this.bitrate = bitrate;
@@ -32,7 +35,7 @@ class AudioCache extends Writable {
 
 	_write(data, enc, next) {
 		if (this.writeCursor + data.length > this.buffer.length) {
-			log.warn("AudioCache: _write: buffer overflow wC=" + this.writeCursor + " dL=" + data.length + " bL=" + this.buffer.length);
+			log.warn(this.canonical + " AudioCache: _write: buffer overflow wC=" + this.writeCursor + " dL=" + data.length + " bL=" + this.buffer.length);
 		}
 		data.copy(this.buffer, this.writeCursor);
 		this.writeCursor += data.length;
@@ -55,13 +58,13 @@ class AudioCache extends Writable {
 	readLast(secondsFromEnd, duration) {
 		var l = this.writeCursor; //this.buffer.length;
 		if (secondsFromEnd < 0 || duration < 0) {
-			log.error("AudioCache: readLast: negative secondsFromEnd or duration");
+			log.error(this.canonical + " AudioCache: readLast: negative secondsFromEnd or duration");
 			return null;
 		} else if (duration > secondsFromEnd) {
-			log.error("AudioCache: readLast: duration=" + duration + " higher than secondsFromEnd=" + secondsFromEnd);
+			log.error(this.canonical + " AudioCache: readLast: duration=" + duration + " higher than secondsFromEnd=" + secondsFromEnd);
 			return null;
 		} else if (secondsFromEnd * this.bitrate > l) {
-			log.error("AudioCache: readLast: attempted to read " + secondsFromEnd + " seconds (" + secondsFromEnd * this.bitrate + " b) while bufferLen=" + l);
+			log.error(this.canonical + " AudioCache: readLast: attempted to read " + secondsFromEnd + " seconds (" + secondsFromEnd * this.bitrate + " b) while bufferLen=" + l);
 			return null;
 		}
 		var data;
@@ -78,10 +81,10 @@ class AudioCache extends Writable {
 	readAmountAfterCursor(duration) {
 		var nextCursor = this.readCursor + duration * this.bitrate;
 		if (duration < 0) {
-			log.error("AudioCache: readAmountAfterCursor: negative duration");
+			log.error(this.canonical + " AudioCache: readAmountAfterCursor: negative duration");
 			return null;
 		} else if (nextCursor >= this.writeCursor) {
-			log.warn("AudioCache: readAmountAfterCursor: will read until " + this.writeCursor + " instead of " + nextCursor);
+			log.warn(this.canonical + " AudioCache: readAmountAfterCursor: will read until " + this.writeCursor + " instead of " + nextCursor);
 		}
 		nextCursor = Math.min(this.writeCursor, nextCursor);
 		var data = this.buffer.slice(this.readCursor, nextCursor);
@@ -90,26 +93,27 @@ class AudioCache extends Writable {
 	}
 
 	getAvailableCache() {
-		return this.buffer ? Math.max(this.writeCursor / this.bitrate - config.user.streamInitialBuffer, 0) : 0;
+		return this.buffer ? Math.max(this.writeCursor / this.bitrate - this.streamInitialBuffer, 0) : 0;
 	}
 }
 
 class MetaCache extends Writable {
 	constructor(options) {
 		super({ objectMode: true });
+		this.canonical = options.canonical;
 		this.meta = {};
 		this.cacheLen = options.cacheLen;
 	}
 
 	_write(meta, enc, next) {
 		if (!meta.type) {
-			log.error("MetaCache: no data type");
+			log.error(this.canonical + " MetaCache: no data type");
 			return next();
 		} else if (!meta.payload) {
-			log.warn("MetaCache: empty " + meta.type + " payload");
+			log.warn(this.canonical + " MetaCache: empty " + meta.type + " payload");
 			return next();
 		} else if (meta.validFrom > meta.validTo) {
-			log.error("MetaCache: negative time window validFrom=" + meta.validFrom + " validTo=" + meta.validTo);
+			log.error(this.canonical + " MetaCache: negative time window validFrom=" + meta.validFrom + " validTo=" + meta.validTo);
 			return next();
 		} else {
 			//log.debug("MetaCache: _write: " + JSON.stringify(meta));
@@ -170,7 +174,7 @@ class MetaCache extends Writable {
 				}
 				break;
 			default:
-				log.error("MetaCache: _write: unknown metadata type = " + meta.type);
+				log.error(this.canonical + " MetaCache: _write: unknown metadata type = " + meta.type);
 		}
 
 		// clean old entries
@@ -183,7 +187,7 @@ class MetaCache extends Writable {
 			if (this.meta[meta.type][i].validTo > this.meta[meta.type][i+1].validFrom) {
 				//var middle = (this.meta[meta.type][i].validTo + this.meta[meta.type][i+1].validFrom) / 2;
 				var delta = (this.meta[meta.type][i].validTo - this.meta[meta.type][i+1].validFrom) / 2;
-				log.debug("MetaCache: fix meta " + meta.type + " overlapping prevTo=" + this.meta[meta.type][i].validTo + " nextFrom=" + this.meta[meta.type][i+1].validFrom + " newBound=" + (this.meta[meta.type][i].validTo - delta));
+				log.debug(this.canonical + " MetaCache: fix meta " + meta.type + " overlapping prevTo=" + this.meta[meta.type][i].validTo + " nextFrom=" + this.meta[meta.type][i+1].validFrom + " newBound=" + (this.meta[meta.type][i].validTo - delta));
 				this.meta[meta.type][i].validTo -= delta;
 				this.meta[meta.type][i+1].validFrom += delta;
 			}
@@ -215,7 +219,6 @@ class MetaCache extends Writable {
 					}
 					continue;
 				}
-				log.warn("MetaCache: read since " + since + "s: no data found for type " + type);
 			}
 			return result;
 		}
@@ -223,12 +226,12 @@ class MetaCache extends Writable {
 }
 
 
-const startMonitoring = function(country, name, config) {
+const startMonitoring = function(country, name, userConfig) {
 	const abr = new Analyser({
 		country: country,
 		name: name,
 		config: {
-			predInterval: config.user.streamGranularity,
+			predInterval: userConfig.streamGranularity,
 			enablePredictorHotlist: true,
 			enablePredictorMl: true,
 			saveAudio: false,
@@ -238,21 +241,37 @@ const startMonitoring = function(country, name, config) {
 		}
 	});
 
-	const audioCache = new AudioCache({ cacheLen: config.user.cacheLen });
-	const metaCache = new MetaCache({ cacheLen: config.user.cacheLen });
+	const audioCache = new AudioCache({
+		canonical: country + "_" + name,
+		cacheLen: userConfig.cacheLen,
+		streamInitialBuffer: userConfig.streamInitialBuffer
+	});
+
+	const metaCache = new MetaCache({
+		canonical: country + "_" + name,
+		cacheLen: userConfig.cacheLen
+	});
+
+	let lastClass = UNSURE;
 
 	abr.on("data", function(obj) {
 		//obj.liveResult.audio = "[redacted]";
 		obj = obj.liveResult;
 		//log.info("status=" + JSON.stringify(Object.assign(obj, { audio: undefined }), null, "\t"));
 
-		audioCache.setBitrate(obj.bitrate);
+		audioCache.setBitrate(obj.streamInfo.bitrate);
 		if (obj.audio) audioCache.write(obj.audio);
-		// todo update bitrate here. set audioCache in Object mode
 
 		const now = +new Date();
-		const validFrom = now - 1000 * config.user.streamGranularity / 2;
-		const validTo   = now + 1000 * config.user.streamGranularity / 2;
+		const validFrom = now - 1000 * userConfig.streamGranularity / 2;
+		const validTo   = now + 1000 * userConfig.streamGranularity / 2;
+
+		if (obj.class === UNSURE) {
+			obj.class = lastClass;
+		} else {
+			lastClass = obj.class;
+		}
+
 		metaCache.write({
 			type: "class",
 			validFrom: validFrom,
@@ -280,31 +299,4 @@ const startMonitoring = function(country, name, config) {
 	}
 }
 
-const updateDlList = function(config) {
-	log.info("refresh playlist");
-
-	const configList = config.radios.map(r => r.country + "_" + r.name);
-	const currentList = config.radios.filter(r => r.liveStatus).map(r =>  r.country + "_" + r.name);
-
-	// add missing monitors
-	for (var i=0; i<configList.length; i++) {
-		const alreadyThere = currentList.includes(configList[i]);
-		if (!alreadyThere) {
-			log.info("updateDlList: start " + config.radios[i].country + "_" + config.radios[i].name);
-			config.radios[i].liveStatus = startMonitoring(config.radios[i].country, config.radios[i].name, config);
-		}
-	}
-
-	// remove obsolete ones.
-	for (var j=currentList-1; j>=0; j--) {
-		const shouldBeThere = configList.includes(currentList[j]);
-		if (!shouldBeThere) {
-			log.info("updateDlList: stop " + dl[j].country + "_" + dl[j].name);
-			const obj = config.radios.filter(r => r.country + "_" + r.name === currentList[j])[0];
-			obj.predictor.stopDl();
-			delete obj.liveStatus;
-		}
-	}
-}
-
-exports.updateDlList = updateDlList;
+exports.startMonitoring = startMonitoring;

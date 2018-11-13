@@ -7,6 +7,18 @@ import classNames from 'classnames';
 import 'rc-checkbox/assets/index.css';
 import defaultCover from "./img/default_radio_logo.svg";
 import removeIcon from "./img/remove_991614.svg";
+import FlagContainer from "./Flag.js";
+import BlueButton from "./BlueButton.js";
+
+const countries = [
+	"France",
+	"United Kingdom",
+	"Belgium",
+	"Spain",
+	"Switzerland",
+	"Italy",
+	"Germany",
+]
 
 class Playlist extends Component {
 	constructor(props) {
@@ -19,6 +31,7 @@ class Playlist extends Component {
 			radiosError: false,
 			radios: [],
 			isElectron: navigator.userAgent.toLowerCase().indexOf(' electron/') > -1,
+			selectionCountry: 0,
 		}
 	}
 
@@ -83,18 +96,20 @@ class Playlist extends Component {
 		var current = this.props.config.radios;
 		var available = this.state.radios;
 		var playlistFull = this.props.config.radios.length >= this.props.config.user.maxRadios;
-		var playlistEmpty = this.props.config.radios.length === 0;
 
 		return (
 			<PlaylistContainer>
-				{!playlistEmpty &&
+				{/*!playlistEmpty &&
 					<PlaylistSectionTitle>{{ en: "Your playlist", fr: "Votre playlist" }[lang]}</PlaylistSectionTitle>
-				}
+				*/}
 				{current.map(function(radio, i) {
+					// TODO it would be nice to make the default cover display if the original logo gives a 40x error.
+					// as is, it does not work
 					return (
 						<PlaylistItem className={classNames({ active: true })} key={"item" + i}>
 							<PlaylistItemTopRow>
-								<PlaylistItemLogo src={radio.favicon || defaultCover} alt="logo" />
+								<PlaylistItemLogo src={radio.favicon || defaultCover} alt="logo"
+									onError={(e)=>{e.target.src=defaultCover}} />
 								<PlaylistItemText onClick={() => self.remove(radio.country, radio.name)}>
 									{radio.name}
 								</PlaylistItemText>
@@ -104,25 +119,58 @@ class Playlist extends Component {
 					)
 				})}
 				{!playlistFull ?
-					<PlaylistSectionTitle>{{ en: "Add radios to your playlist", fr: "Ajouter des radios à votre playlist" }[lang]}</PlaylistSectionTitle>
+					<div>
+						<PlaylistSectionTitle>{{ en: "Add radios to your playlist", fr: "Ajouter des radios à votre playlist" }[lang]}</PlaylistSectionTitle>
+						<ChoiceCountryContainer>
+							{/*<p>{{ en: "Choose the country of radios", fr: "Choisissez le pays des radios" }[lang]}</p>*/}
+							{countries.map(function(lang, index) {
+								return (
+									<FlagContainer country={lang}
+										key={index}
+										selected={self.state.selectionCountry === index}
+										onClick={() => self.setState({ selectionCountry: index })}
+										width={32}
+										height={24} >
+									</FlagContainer>
+								);
+							})}
+						</ChoiceCountryContainer>
+
+						{available.filter(r => r.country === countries[this.state.selectionCountry]).map(function(radio, i) {
+							return (
+								<PlaylistItem className={classNames({ active: !playlistFull })} key={"item" + i}
+									onClick={function() { if (!playlistFull) self.insert(radio.country, radio.name); }}>
+									<PlaylistItemTopRow>
+										<PlaylistItemLogo src={radio.favicon || defaultCover} alt={radio.name} />
+										<PlaylistItemText>
+											{radio.name}
+										</PlaylistItemText>
+										{!playlistFull &&
+											<AddIcon src={removeIcon} />
+										}
+									</PlaylistItemTopRow>
+								</PlaylistItem>
+							)
+						})}
+					</div>
 				:
-				<PlaylistSectionTitle>{{ en: "Your playlist is full. If you want to change it, first make room in it", fr: "Votre playlist est pleine. Si vous souhaitez la modifier, faites-y d'abord de la place" }[lang]}</PlaylistSectionTitle>
+					<FullNoticeContainer>
+						<PlaylistSectionTitle>
+							{{ en: "Your playlist is ready. You can now customize your filters.",
+								fr: "Votre playlist est prête. Vous pouvez maintenant personnaliser vos filtres." }[lang]}
+						</PlaylistSectionTitle>
+						<BlueButton onClick={() => this.props.finish()}>
+							{{ en: "Select filters", fr: "Choisir les filtres" }[lang]}
+						</BlueButton>
+						<PlaylistSectionTitle>
+							{{ en: "If you want to change the playlist, first make room in it.",
+								fr: "Si vous souhaitez modifier votre playlist, faites-y d'abord de la place." }[lang]}
+						</PlaylistSectionTitle>
+					</FullNoticeContainer>
+
 				}
-				{available.map(function(radio, i) {
-					return (
-						<PlaylistItem className={classNames({ active: !playlistFull })} key={"item" + i} onClick={function() { if (!playlistFull) self.insert(radio.country, radio.name); }}>
-							<PlaylistItemTopRow>
-								<PlaylistItemLogo src={radio.favicon || defaultCover} alt={radio.name} />
-								<PlaylistItemText>
-									{radio.name}
-								</PlaylistItemText>
-								{!playlistFull &&
-									<AddIcon src={removeIcon} />
-								}
-							</PlaylistItemTopRow>
-						</PlaylistItem>
-					)
-				})}
+
+
 			</PlaylistContainer>
 		)
 	}
@@ -132,7 +180,8 @@ Playlist.propTypes = {
 	config: PropTypes.object.isRequired,
 	insertRadio: PropTypes.func.isRequired,
 	removeRadio: PropTypes.func.isRequired,
-	locale: PropTypes.string.isRequired
+	locale: PropTypes.string.isRequired,
+	finish: PropTypes.func.isRequired,
 };
 
 const PlaylistContainer = styled.div`
@@ -140,13 +189,14 @@ const PlaylistContainer = styled.div`
 	padding-bottom: 60px;
 `;
 
-const PlaylistSectionTitle = styled.h3`
+const PlaylistSectionTitle = styled.p`
+	font-size: bigger;
 	text-align: center;
 	margin: 10px 10px 0px 10px;
 `;
 
 const PlaylistItem = styled.div`
-	border: 2px solid #eee;
+	border: 1px solid grey;
 	border-radius: 10px;
 	margin: 10px;
 	padding: 10px;
@@ -155,6 +205,7 @@ const PlaylistItem = styled.div`
 	display: flex;
 	flex-direction: column;
 	cursor: not-allowed;
+	box-shadow: 0px 2px 3px grey;
 
 	&.active {
 		cursor: pointer;
@@ -199,6 +250,23 @@ const SoloMessage = styled.div`
 	background: white;
 	border: 1px solid grey;
 	border-radius: 20px;
+`;
+
+const ChoiceCountryContainer = styled.div`
+	display: flex;
+	flex-direction: row;
+	justify-content: center;
+`;
+
+const FullNoticeContainer = styled.div`
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	background: white;
+	width: 80%;
+	margin: auto;
+	border-radius: 10px;
+	padding: 10px;
 `;
 
 export default Playlist;

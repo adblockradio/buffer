@@ -1,6 +1,5 @@
 const { log } = require('abr-log')('radios');
 const { insertRadio, removeRadio, getAvailableInactive, config } = require('../handlers/config');
-const { updateDlList } = require('../handlers/cache');
 
 const insertRadioRoute = (app) => app.put('/config/radios/:country/:name', function(request, response) {
 	response.set({ 'Access-Control-Allow-Origin': '*' });
@@ -14,7 +13,6 @@ const insertRadioRoute = (app) => app.put('/config/radios/:country/:name', funct
 		} else {
 			response.writeHead(200);
 			response.end("OK");
-			updateDlList(config);
 		}
 	});
 });
@@ -31,7 +29,6 @@ const removeRadioRoute = (app) => app.delete('/config/radios/:country/:name', fu
 		} else {
 			response.writeHead(200);
 			response.end("OK");
-			updateDlList(config);
 		}
 	});
 });

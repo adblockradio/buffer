@@ -2,34 +2,25 @@
 
 import React, { Component } from 'react';
 import './App.css';
-//import Radio from './Radio.js';
-//import Metadata from './Metadata.js';
-import DelaySVG from './DelaySVG.js';
+import Onboarding from './Onboarding.js';
 import Config from './Config.js';
 import Playlist from './Playlist.js';
+import Playing from './Playing.js';
+import Controls from './Controls.js';
+import SoloMessage from './SoloMessage';
 
 import { loadScript, refreshStatus } from './load.js';
 import { play, stop, setVolume } from './audio.js';
 import styled from "styled-components";
-/*import * as moment from 'moment';*/
 import classNames from 'classnames';
 import async from 'async';
-
-
-//import iconPlay from "./img/start_1279169.svg";
-import iconStop from "./img/stop_1279170.svg";
-import iconList from "./img/list_241386.svg";
-import iconConfig from "./img/ads_135894.svg";
-//import iconNext from "./img/next_607554.svg";
-//import defaultCover from "./img/default_radio_logo.svg";
-import playing from "./img/playing.gif";
 
 /* global cordova */
 /* global Android */
 
 const DELAYS = {
-	FETCH_UPDATES_PLAYING: 2000,
-	FETCH_UPDATES_IDLE: 5000, // if higher than 10, need to update value in load.js
+	FETCH_UPDATES_PLAYING: 1000,
+	FETCH_UPDATES_IDLE: 1000, // if higher than 10, need to update value in load.js
 	VISUALS_ACTIVE: 1000,
 	VISUALS_HIDDEN: 10000
 }
@@ -37,6 +28,14 @@ const DELAYS = {
 const VOLUMES = {
 	MUTED: 0.1,
 	DEFAULT: 0.5
+}
+
+const VIEWS = {
+	LOADING: 100,
+	ONBOARDING: 101,
+	PLAYLIST: 102,
+	CONFIG: 103,
+	PLAYER: 104,
 }
 
 class App extends Component {
@@ -50,8 +49,7 @@ class App extends Component {
 			playingRadio: null,
 			playingDelay: null,
 			clockDiff: 0,
-			playlistEditMode: false,
-			configEditMode: false,
+			view: VIEWS.LOADING,
 			locale: "fr",
 			stopUpdates: false,
 			communicationError: false,
@@ -61,10 +59,6 @@ class App extends Component {
 			isAndroidApp: navigator.userAgent === "abr_android"
 		}
 		this.play = this.play.bind(this);
-		//this.seekBackward = this.seekBackward.bind(this);
-		//this.seekForward = this.seekForward.bind(this);
-		this.switchPlaylistEditMode = this.switchPlaylistEditMode.bind(this);
-		this.switchConfigEditMode = this.switchConfigEditMode.bind(this);
 		this.refreshStatusContainer = this.refreshStatusContainer.bind(this);
 		this.refreshConfig = this.refreshConfig.bind(this);
 		this.tick = this.tick.bind(this);
@@ -72,6 +66,7 @@ class App extends Component {
 		this.removeRadio = this.removeRadio.bind(this);
 		this.toggleContent = this.toggleContent.bind(this);
 		this.setLocale = this.setLocale.bind(this);
+		this.getCurrentMetaForRadio = this.getCurrentMetaForRadio.bind(this);
 	}
 
 	componentDidMount() {
@@ -89,7 +84,11 @@ class App extends Component {
 			console.log("detected web environment");
 		}
 		this.refreshConfig(function() {
-			if (self.state.config.radios && self.state.config.radios.length === 0) self.setState({ playlistEditMode: true });
+			if (self.state.config.radios && self.state.config.radios.length === 0) {
+				self.setState({ view: VIEWS.ONBOARDING });
+			} else {
+				self.setState({ view: VIEWS.PLAYER });
+			}
 		});
 		this.newTickInterval(DELAYS.VISUALS_ACTIVE);
 
@@ -159,6 +158,11 @@ class App extends Component {
 		for (var i=0; i<resParsed.length; i++) { // for each radio
 			var radio = resParsed[i].country + "_" + resParsed[i].name;
 			stateChange[radio + "|available"] = resParsed[i].available;
+
+			// TODO: after a stream restart, buffer has collapsed. We should set cursor accordingly.
+			/*if (this.state[radio + "|cursor"] && resParsed[i].available < +this.state.date - this.state[radio + "|cursor"]) {
+				stateChange[radio + "|cursor"] = +this.state.date - resParsed[i].available;
+			}*/
 			stateChange.clockDiff = +new Date() - resParsed[i].now;
 
 			for (var j=0; j<types.length; j++) { // for each of ["class", "metadata", "volume"]
@@ -388,7 +392,7 @@ class App extends Component {
 	}
 
 	defaultDelay(radio) {
-		var delays = [+this.state[radio + "|available"]*1000, this.state.config.user.cacheLen*1000*2/3];
+		var delays = [(+this.state[radio + "|available"]-this.state.config.user.streamInitialBuffer)*1000, this.state.config.user.cacheLen*1000*2/3];
 		var classes = this.state[radio + "|class"];
 		if (classes) {
 			var firstMetaDate = classes[classes.length-1].validFrom;
@@ -556,24 +560,6 @@ class App extends Component {
 		}
 	}
 
-	/*seekBackward() {
-		if (!this.state.playingRadio) return;
-		this.play(this.state.playingRadio, Math.min(this.state.playingDelay + 30000, this.state.config.user.cacheLen*1000));
-	}
-
-	seekForward() {
-		if (!this.state.playingRadio) return;
-		this.play(this.state.playingRadio, Math.max(this.state.playingDelay - 30000,0));
-	}*/
-
-	switchPlaylistEditMode() {
-		this.setState({ playlistEditMode: !this.state.playlistEditMode, configEditMode: false });
-	}
-
-	switchConfigEditMode() {
-		this.setState({ configEditMode: !this.state.configEditMode, playlistEditMode: false });
-	}
-
 	setLocale(lang) {
 		this.setState({ locale: lang });
 	}
@@ -608,9 +594,10 @@ class App extends Component {
 	async toggleContent(country, name, contentType, enabled) {
 		try {
 			// /config/radios/:country/:name/content/:type/:enable
+			// Note: */ads/* is blocked by browser ad blocker, hence the indexOf(...).
 			if (!this.state.isElectron) {
 				await fetch("config/radios/" + encodeURIComponent(country) + "/" + encodeURIComponent(name) + "/content/" +
-					encodeURIComponent(contentType) + "/" + (enabled ? "enable" : "disable") + "?t=" + Math.round(Math.random()*1000000), { method: "PUT" });
+					["ads", "speech"].indexOf(contentType) + "/" + (enabled ? "enable" : "disable") + "?t=" + Math.round(Math.random()*1000000), { method: "PUT" });
 			} else {
 				await new Promise((resolve) => { navigator.abrserver.toggleContent(country, name, contentType, (enabled ? "enable" : "disable"), resolve); });
 			}
@@ -623,7 +610,6 @@ class App extends Component {
 	render() {
 		let config = this.state.config;
 		let lang = this.state.locale;
-		const self = this;
 		if (!this.state.configLoaded) {
 			return (
 				<SoloMessage>
@@ -639,131 +625,92 @@ class App extends Component {
 			)
 		}
 
-		var statusText;
-		if (this.state.playingRadio) {
-			var delayText = { en: "Live", fr: "En direct" }[lang];
-			if (this.state.playingDelay > 0) {
-				var delaySeconds = Math.round(this.state.playingDelay/1000);
-				var delayMinutes = Math.floor(delaySeconds / 60);
-				delaySeconds = delaySeconds % 60;
-				var textDelay = (delayMinutes ? delayMinutes + " min" : "");
-				textDelay += (delaySeconds ? ((delaySeconds < 10 && delayMinutes ? " 0" : " ") + delaySeconds + "s") : "");
-				delayText = { en: textDelay + " ago", fr: "Différé de " + textDelay }[lang];
-			}
-			statusText = (
-				<span>
-					{this.state.playingRadio.split("_")[1]}<br />
-					<DelayText>{delayText}</DelayText>
-				</span>
-			)
-		} else {
-			statusText = (
-				<span>
-					{{ en: "Start a radio", fr: "Lancez une radio" }[lang]}
-				</span>
-			)
-		}
-
-		var status = (
-			<StatusTextContainer>
-				{/*<StatusClock>{moment(self.state.date).format("HH:mm")}</StatusClock>&nbsp;–&nbsp;*/}
-				{statusText}
-			</StatusTextContainer>
-		);
-
-		var buttons = (
-			<StatusButtonsContainer>
-				<PlaybackButton className={classNames({ inactive: !this.state.configEditMode })} src={iconConfig} alt={{ en: "Edit config", fr: "Configurer l'écoute" }[lang]} onClick={this.switchConfigEditMode} />
-				<PlaybackButton className={classNames({ inactive: !this.state.playlistEditMode })} src={iconList} alt={{ en: "Edit playlist", fr: "Changer de liste de radios" }[lang]} onClick={this.switchPlaylistEditMode} />
-				{/*<PlaybackButton className={classNames({ flip: true, inactive: !this.state.playingRadio || this.state.playingDelay >= this.state.config.user.cacheLen*1000 })} src={iconPlay} alt="Backward 30s" onClick={this.seekBackward} />*/}
-				<PlaybackButton className={classNames({ inactive: !this.state.playingRadio })} src={iconStop} alt="Stop" onClick={() => this.play(null, null, null)} />
-				{/*<PlaybackButton className={classNames({ inactive: !this.state.playingRadio || this.state.playingLive })} src={iconPlay} alt="Forward 30s" onClick={this.seekForward} />*/}
-			</StatusButtonsContainer>
-		);
-
 		//console.log("Metadata props: date=" + (+this.state.date) + " clockDiff=" + this.state.clockDiff + " playingDelay=" + this.state.playingDelay);
 
 		let mainContents;
-		if (this.state.configEditMode) {
+		if (this.state.view === VIEWS.ONBOARDING) {
+			mainContents = (
+				<Onboarding setLocale={this.setLocale}
+					locale={this.state.locale}
+					finished={() => this.setState({ view: VIEWS.PLAYLIST })} />
+			);
+
+		} else if (this.state.view === VIEWS.CONFIG) {
 			mainContents = (
 				<Config config={this.state.config}
 					toggleContent={this.toggleContent}
 					locale={this.state.locale}
+					finish={() => this.setState({ view: VIEWS.PLAYER })}
 					setLocale={this.setLocale} />
 			);
-		} else if (this.state.playlistEditMode || config.radios.length === 0) {
+
+		} else if (this.state.view === VIEWS.PLAYLIST || config.radios.length === 0) {
 			mainContents = (
 				<Playlist config={this.state.config}
 					insertRadio={this.insertRadio}
 					removeRadio={this.removeRadio}
+					finish={() => this.setState({ view: VIEWS.CONFIG })}
 					locale={this.state.locale} />
 			);
-		} else {
+
+		} else if (this.state.view === VIEWS.PLAYER) {
+			const radioState = {};
+			const self = this;
+			this.state.config.radios.map(function(radioObj, i) {
+				var radio = radioObj.country + "_" + radioObj.name;
+				return radioState[radio] = {
+					metadata: self.state[radio + "|metadata"],
+					cursor: self.state[radio + "|cursor"],
+					availableCache: self.state[radio + "|available"],
+					classList: self.state[radio + "|class"],
+				}
+			});
+
 			mainContents = (
-				<RadioList>
-					{this.state.communicationError &&
-						<SoloMessage>
-							<p>{{ en: "The communication with the server is temporarily unavailable…", fr: "La connection au serveur est momentanément interrompue…" }[lang]}</p>
-						</SoloMessage>
-					}
-					{config.radios.map(function(radioObj, i) {
-						var radio = radioObj.country + "_" + radioObj.name;
-						var playing = self.state.playingRadio === radio;
-						var meta = self.getCurrentMetaForRadio(radio);
-
-						return (
-							<RadioItem className={classNames({ playing: playing })}
-								id={"RadioItem" + i}
-								key={"RadioItem" + i}>
-
-								<RadioItemTopLine onClick={function() { self.play(radio, null, null); }}>
-									<RadioLogo src={radioObj.favicon} alt={radio} />
-									<MetadataItem>
-										<MetadataText>
-											{meta.text || radio}
-										</MetadataText>
-										{meta.image &&
-											<MetadataCover src={meta.image} />
-										}
-									</MetadataItem>
-								</RadioItemTopLine>
-
-								{self.state[radio + "|metadata"] &&
-									<DelaySVG cursor={+self.state.date - self.state[radio + "|cursor"]}
-										availableCache={self.state[radio + "|available"]}
-										classList={self.state[radio + "|class"]}
-										date={new Date(+self.state.date - self.state.clockDiff)}
-										playing={playing}
-										cacheLen={self.state.config.user.cacheLen}
-										width={self.state.canvasWidth || 100}
-										playCallback={function(delay) { self.play(radio, delay, null); }} />
-								}
-
-							</RadioItem>
-						)
-					})}
-				</RadioList>
+				<Playing communicationError={this.state.communicationError}
+					config={this.state.config}
+					playingRadio={this.state.playingRadio}
+					radioState={radioState}
+					canvasWidth={this.state.canvasWidth}
+					date={+this.state.date}
+					clockDiff={this.state.clockDiff}
+					locale={this.state.locale}
+					play={this.play}
+					getCurrentMetaForRadio={this.getCurrentMetaForRadio} />
 			);
 		}
 
-
 		return (
 			<AppParent>
+				<Tabs>
+					<MaxWidthContainer>
+						<TabItem onClick={() => this.state.config.radios.length && this.setState({ view: VIEWS.PLAYER })}
+							className={classNames({ 'active': this.state.view === VIEWS.PLAYER, 'disabled': !this.state.config.radios.length })}>
+							{{ en: "Adblock Radio", fr: "Adblock Radio" }[lang]}
+						</TabItem>
+						<TabItem onClick={() => this.setState({ view: VIEWS.PLAYLIST })}
+							className={classNames({ 'active': this.state.view === VIEWS.PLAYLIST })}>
+							{{ en: "Playlist", fr: "Playlist" }[lang]}
+						</TabItem>
+						<TabItem onClick={() => this.state.config.radios.length && this.setState({ view: VIEWS.CONFIG })}
+							className={classNames({ 'active': this.state.view === VIEWS.CONFIG, 'disabled': !this.state.config.radios.length })}>
+							{{ en: "Filters", fr: "Filtres" }[lang]}
+						</TabItem>
+						<TabItem onClick={() => this.setState({ view: VIEWS.ONBOARDING })}
+							className={classNames({ 'active': this.state.view === VIEWS.ONBOARDING })}>
+							{{ en: "Help", fr: "Aide" }[lang]}
+						</TabItem>
+					</MaxWidthContainer>
+				</Tabs>
+				<TabSpacer />
 				<AppView>
 					{mainContents}
 				</AppView>
-				<Controls>
-					<MaxWidthContainer>
-						{this.state.playingRadio &&
-							<PlayingGif src={playing} />
-						}
-						{status}
-						{buttons}
-						{/*metaList={this.state[this.state.playingRadio + "|metadata"]}*/}
-
-						{/*<PlayerStatus settings={this.props.settings} bsw={this.props.bsw} condensed={this.props.condensed} playbackAction={this.togglePlayer} />*/}
-					</MaxWidthContainer>
-				</Controls>
+				<Controls playingRadio={this.state.playingRadio}
+					playingDelay={this.state.playingDelay}
+					play={this.play}
+					locale={this.state.locale}
+					canStart={this.state.playingRadio || this.state.view === VIEWS.PLAYER} />
 			</AppParent>
 		);
 	}
@@ -780,84 +727,57 @@ class App extends Component {
 
 const AppParent = styled.div`
 	width: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	/*background: url('bg.jpg') no-repeat center center fixed;*/
+	background: #dff0ff;
+	-webkit-background-size: cover;
+	-moz-background-size: cover;
+	-o-background-size: cover;
+	background-size: cover;
+	height: 100vh;
 `;
 
 const AppView = styled.div`
-	display: flex;
-	height: calc(100% - 60px);
+	height: calc(100% - 105px);
 	max-width: 600px;
-	margin: auto;
-`;
-
-const RadioList = styled.div`
-	display: inline-flex;
-	flex-wrap: wrap;
-	justify-content: center;
-	flex-grow: 0;
-	flex-direction: column;
-	align-self: flex-start;
-	flex-grow: 1;
-	padding-bottom: 70px;
+	margin: 45px auto 0px auto;
+	position: fixed;
 	overflow-y: auto;
+	overflow-x: hidden;
+	width: 100%;
+	/*background: white;*/
 `;
 
-const RadioItem = styled.div`
-	border: 2px solid grey;
-	border-radius: 10px;
-	margin: 10px 10px 0px 10px;
-	padding: 10px 10px 6px 10px;
-	width: calc(100% - 44px);
-	cursor: pointer;
-	background: white;
+const TabSpacer = styled.div`
+	height: 55px;
+`;
 
-	&.playing {
-		border: 2px solid #ef66b0;
+const Tabs = styled.div`
+	padding: 10px 0px;
+	width: 100%;
+	position: fixed;
+	height: 45px;
+	z-index: 1000;
+	background: white;
+	border-bottom: 2px solid grey;
+`;
+
+const TabItem = styled.div`
+	cursor: pointer;
+
+	&.active {
+		font-weight: bold;
+	}
+
+	&.disabled {
+		color: #bbb;
+		cursor: not-allowed;
 	}
 `;
 
-const RadioItemTopLine = styled.div`
-	display: flex;
-	flex-direction: row;
-`;
-
-const RadioLogo = styled.img`
-	height: 60px;
-	width: 60px;
-	border: 1px solid grey;
-`;
-
-const MetadataItem = styled.div`
-	flex-grow: 1;
-	border-radius: 0 5px 5px 0;
-	padding: 0 10px;
-	flex-shrink: 1;
-	background: #eee;
-	display: flex;
-	cursor: pointer;
-`;
-
-const MetadataText = styled.p`
-	flex-grow: 1;
-	align-self: center;
-	margin: 10px 0;
-	font-size: 13px;
-`;
-
-const MetadataCover = styled.img`
-	width: 40px;
-	height: 40px;
-	align-self: center;
-	margin-left: 10px;
-`;
-
-const PlayingGif = styled.img`
-	align-self: center;
-	height: 40px;
-	width: 40px;
-	margin: 0 -10px 0 10px;
-`;
-
-const Controls = styled.div`
+/*const Container = styled.div`
 	z-index: 1000;
 	background: #eee;
 	height: 60px;
@@ -865,62 +785,18 @@ const Controls = styled.div`
 	bottom: 0;
 	position: fixed;
 	width: 100%;
-`;
+`;*/
 
 const MaxWidthContainer = styled.div`
 	max-width: 600px;
 	margin: auto;
 	align-items: center;
 	display: flex;
-	justify-content: space-between;
+	justify-content: space-around;
 	height: 100%;
-`;
-
-const StatusTextContainer = styled.span`
-	padding: 0px 10px 0 20px;
-	flex-shrink: 1;
-	flex-grow: 1;
-`;
-
-/*const StatusClock = styled.span`
-	font-weight: bold;
-`;*/
-
-const DelayText = styled.span`
-	font-size: 12px;
-`;
-
-const StatusButtonsContainer = styled.span`
-	padding: 5px 0 0 0;
-	flex-shrink: 0;
-	margin-right: 20px;
-`;
-
-const PlaybackButton = styled.img`
-	height: 35px;
-	margin-left: 7px;
-	cursor: pointer;
-	margin-top: 0px;
-
-	&.flip {
-		transform: rotate(180deg);
-	}
-	&.inactive {
-		filter: opacity(0.25);
-		cursor: unset;
-	}
-`;
-
-const SoloMessage = styled.div`
-	align-self: center;
-	margin: 50px auto;
-	padding: 20px 40px;
+	width: 100%;
+	padding: 0px 10px;
 	background: white;
-	border: 1px solid grey;
-	border-radius: 20px;
 `;
 
 export default App;
-/*{this.state.playingRadio && this.state.playingDate &&
-	<audio src={HOST + "/listen/" + this.state.playingRadio + "/" + this.state.playingDate} controls autoPlay />
-}*/

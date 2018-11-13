@@ -1,26 +1,25 @@
 import React, { Component } from "react";
 import PropTypes from "prop-types";
-//import consts from "../consts.js";
 import styled from "styled-components";
 import classNames from "classnames";
 
-import frFlag from "./img/flags/fr.png";
-import ukFlag from "./img/flags/uk.png";
-import beFlag from "./img/flags/be.png";
-import deFlag from "./img/flags/de.png";
-import spFlag from "./img/flags/sp.png";
-import swFlag from "./img/flags/sw.png";
-import itFlag from "./img/flags/it.png";
+import France from "./img/flags/France.svg";
+import UK from "./img/flags/United Kingdom.svg";
+import Belgium from "./img/flags/Belgium.svg";
+import Germany from "./img/flags/Germany.svg";
+import Spain from "./img/flags/Spain.svg";
+import Switzerland from "./img/flags/Switzerland.svg";
+import Italy from "./img/flags/Italy.svg";
 
-var flags = {
-	fr: frFlag, "France": frFlag,
-	en: ukFlag, "United Kingdom": ukFlag,
-	be: beFlag, "Belgium": beFlag,
-	sp: spFlag, "Spain": spFlag,
-	sw: swFlag, "Switzerland": swFlag,
-	it: itFlag, "Italy": itFlag,
-	de: deFlag, "Germany": deFlag
-};
+const flags = {
+	"France": France,
+	"United Kingdom": UK,
+	"Belgium": Belgium,
+	"Spain": Spain,
+	"Switzerland": Switzerland,
+	"Italy": Italy,
+	"Germany": Germany,
+}
 
 const FlagBox = styled.div`
 	border-radius: 5px;

@@ -27,13 +27,13 @@ class DelaySVG extends Component {
 		var x = event.clientX - rect.left;
 
 		//var width = this.refs.canvas.getContext("2d").canvas.width;
-		var newDelay = Math.round(this.props.cacheLen*(1-x/this.props.width)*1000);
+		var newDelay = Math.round((this.props.cacheLen*(1-x/this.props.width)-(this.props.cacheLen-this.props.availableCache+this.props.streamInitialBuffer))*1000);
 		//console.log("Canvas click: x=" + x + " width=" + width + " cacheLen=" + this.props.cacheLen + " newDelay=" + newDelay);
 		this.play(newDelay);
 	}
 
 	delayToX(width, delay) {
-		return Math.round(width*(1-(this.props.cacheLen-this.props.availableCache+delay/1000)/this.props.cacheLen));
+		return Math.round(width*(1-(this.props.cacheLen-this.props.availableCache+this.props.streamInitialBuffer+delay/1000)/this.props.cacheLen));
 	}
 
 	render() {
@@ -78,11 +78,11 @@ class DelaySVG extends Component {
 			Math.round(cursorX-0.3*height) + ",0";
 
 		return (
-			<svg width={this.props.width} height={height + "px"} onClick={self.getCursorPosition} ref="canvas" style={{marginTop: "10px"}}>
+			<svg width={this.props.width-24} height={height + "px"} onClick={self.getCursorPosition} ref="canvas" style={{marginTop: "10px"}}>
 
-				{!isNaN(cursorX) &&
+				{/*!isNaN(cursorX) &&
 					<rect x={0} y={0} width={cursorX} height={this.props.classList ? 0.4*height : height} style={{fill: this.props.playing ? colors.LIGHT_PINK : colors.LIGHT_GREY}} />
-				}
+				*/}
 
 				{this.props.classList && xStartClass.map(function(xStart, i) {
 					return (
@@ -107,7 +107,8 @@ DelaySVG.propTypes = {
 	availableCache: PropTypes.number,
 	date: PropTypes.object.isRequired,
 	cacheLen: PropTypes.number.isRequired,
-	playCallback: PropTypes.func.isRequired
+	playCallback: PropTypes.func.isRequired,
+	classList: PropTypes.array.isRequired,
 };
 
 /*var canvasContainerStyle = {
