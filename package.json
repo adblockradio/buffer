@@ -1,5 +1,6 @@
 {
   "name": "adblockradio-buffer",
+  "productName": "Adblock Radio Buffer",
   "version": "1.0.0",
   "description": "Adblock Radio module to buffer radio stream data and deliver it to end user according to its listening preferences.",
   "main": "index.js",
@@ -7,7 +8,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
     "startdev": "env DEV=1 node index.js",
-    "electron": "electron electron.js",
+    "electron": "electron index.js",
+    "electrondev": "ELECTRON_START_URL=http://localhost:3000 electron index.js",
+    "electronbuild": "electron-packager . --overwrite",
     "postinstall": "electron-builder install-app-deps",
     "pack": "electron-builder --dir",
     "dist": "electron-builder"
@@ -16,17 +19,20 @@
   "license": "UNLICENSED",
   "dependencies": {
     "abr-log": "^1.0.2",
+    "adblockradio": "file:../adblockradio",
     "async": "^2.6.1",
     "axios": "^0.18.0",
     "express": "^4.16.4",
+    "fs-extra": "^7.0.1",
     "http-proxy-middleware": "^0.19.0",
-    "jsonwebtoken": "^8.3.0",
     "stream-tireless-baler": "^1.0.14",
+    "uuid": "^3.3.2",
     "webradio-metadata": "^0.1.31"
   },
   "devDependencies": {
-    "electron": "^3.0.8",
+    "electron": "^3.0.9",
     "electron-builder": "^20.34.0",
+    "electron-packager": "^12.2.0",
     "eslint": "^5.8.0"
   }
 }

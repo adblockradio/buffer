@@ -11,6 +11,9 @@ const isElectron = !!process.versions['electron']; // in a Electron environment 
 if (!isElectron) {
 	// start http server and API endpoints
 	require('./handlers/app');
+} else {
+	// open the electron window
+	require('./electron.js')(Config);
 }
 
 module.exports = Config;
