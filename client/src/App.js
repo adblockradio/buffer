@@ -9,7 +9,6 @@ import Playing from './Playing.js';
 import Controls from './Controls.js';
 import SoloMessage from './SoloMessage';
 
-import { loadScript, refreshStatus } from './load.js';
 import { play, stop, setVolume } from './audio.js';
 import styled from "styled-components";
 import classNames from 'classnames';
@@ -67,6 +66,7 @@ class App extends Component {
 		this.toggleContent = this.toggleContent.bind(this);
 		this.setLocale = this.setLocale.bind(this);
 		this.getCurrentMetaForRadio = this.getCurrentMetaForRadio.bind(this);
+		this.flagContent = this.flagContent.bind(this);
 	}
 
 	componentDidMount() {
@@ -75,9 +75,17 @@ class App extends Component {
 			console.log("detected Electron environment");
 		} else if (this.state.isCordovaApp) {
 			console.log("detected Cordova environment");
-			loadScript("./cordova.js", function() {
+			// https://stackoverflow.com/questions/950087/how-do-i-include-a-javascript-file-in-another-javascript-file
+			const head = document.getElementsByTagName('head')[0];
+			const script = document.createElement('script');
+			script.type = 'text/javascript';
+			script.src = "./cordova.js";
+			const callback = function() {
 				console.log("cordova script loaded");
-			});
+			}
+			script.onreadystatechange = callback;
+			script.onload = callback;
+			head.appendChild(script);
 		} else if (this.state.isAndroidApp) {
 			console.log("detected Android environment");
 		} else {
@@ -142,12 +150,28 @@ class App extends Component {
 		}
 	}
 
+	async refreshStatus(requestFullData) {
+		const since = requestFullData ? this.state.config.user.cacheLen : Math.round(Math.max(DELAYS.FETCH_UPDATES_IDLE, DELAYS.FETCH_UPDATES_PLAYING)/1000 + 5);
+		if (!this.state.isElectron) {
+			try {
+				const request = await fetch("status/" + since + "?t=" + Math.round(Math.random()*1000000));
+				const res = await request.text();
+				return JSON.parse(res);
+			} catch (e) {
+				console.log("refreshStatus: could not load status update for radios. err=" + e);
+				return null;
+			}
+		} else {
+			return navigator.abrserver.gatherStatus(since);
+		}
+	}
+
 	async refreshStatusContainer(options) {
 		if (this.state.stopUpdates) return;
 
 		//console.log("refresh status");
 		var self = this;
-		const resParsed = await refreshStatus(options.requestFullData);
+		const resParsed = await this.refreshStatus(options.requestFullData);
 		if (!resParsed) {
 			this.play(null, null, function() {});
 			return this.setState({ communicationError: true });
@@ -317,7 +341,17 @@ class App extends Component {
 		}
 
 		if (!this.state[radio + "|cursor"]) { // set the default delay
+			console.log(radio + " set default delay");
 			stateChange[radio + "|cursor"] = +this.state.date - this.defaultDelay(radio);
+			return this.setState(stateChange, function() {
+				callback({ err: null, delayChanged: true, hasAcceptableContent: true });
+			});
+		}
+
+		const minCursor = +this.state.date - 1000*this.state[radio + "|available"];
+		if (this.state[radio + "|cursor"] < minCursor) {
+			console.log(radio + " move cursor from" + this.state[radio + "|cursor"] + " to " + minCursor);
+			stateChange[radio + "|cursor"] = minCursor;
 			return this.setState(stateChange, function() {
 				callback({ err: null, delayChanged: true, hasAcceptableContent: true });
 			});
@@ -392,7 +426,7 @@ class App extends Component {
 	}
 
 	defaultDelay(radio) {
-		var delays = [(+this.state[radio + "|available"]-this.state.config.user.streamInitialBuffer)*1000, this.state.config.user.cacheLen*1000*2/3];
+		var delays = [(+this.state[radio + "|available"])*1000, this.state.config.user.cacheLen*1000*2/3];
 		var classes = this.state[radio + "|class"];
 		if (classes) {
 			var firstMetaDate = classes[classes.length-1].validFrom;
@@ -515,15 +549,23 @@ class App extends Component {
 	}
 
 	play(radio, delay, callback) {
-		if (radio || delay) {
+		// play radio. params:
+		//     radio: if present, play that radio, otherwise stop
+		//     delay: if present, play at that delay. otherwise, play at current cursor position.
+		//     callback: optional
+
+		const maxDelay = 1000 * (Math.min(this.state.config.user.cacheLen, +this.state[radio + "|available"]));// - this.state.config.user.streamInitialBuffer);
+		console.log("play radio=" + radio + " delay=" + delay + " maxDelay=" + maxDelay);
+
+		if (radio && maxDelay > 0 && !(delay === null && radio === this.state.playingRadio)) {
 			radio = radio || this.state.playingRadio;
 			if (delay === null || delay === undefined || isNaN(delay)) { // delay == 0 is a valid delay.
 				delay = +this.state.date - this.state[radio + "|cursor"];
-			} else if (delay < 0) {
-				delay = 0;
-			} else if (delay > Math.min(this.state.config.user.cacheLen*1000, +this.state[radio + "|available"]*1000)) {
-				delay = Math.min(this.state.config.user.cacheLen*1000, +this.state[radio + "|available"]*1000);
 			}
+
+			if (delay < 0) delay = 0;
+			if (delay > maxDelay) delay = maxDelay;
+
 			delay = Math.round(delay/1000)*1000; // rounded seconds
 
 			console.log("Play: radio=" + radio + " delay=" + delay + "ms");
@@ -537,7 +579,7 @@ class App extends Component {
 			});
 
 			document.title = radio.split("_")[1] + " - Adblock Radio";
-			var url = "listen/" + encodeURIComponent(radio) + "/" + (delay/1000) + "?t=" + Math.round(Math.random()*1000000000);
+			const url = "listen/" + encodeURIComponent(radio) + "/" + (delay/1000) + "?t=" + Math.round(Math.random()*1000000000);
 			play(url, function(err) {
 				if (err) console.log("Play: error=" + err);
 				if (callback) callback(err);
@@ -607,6 +649,34 @@ class App extends Component {
 		}
 	}
 
+	async flagContent() {
+		console.log("will submit flag");
+		const cursors = {};
+		for (let i=0; i<this.state.config.radios.length; i++) {
+			const radio = this.state.config.radios[i];
+			const canonical = radio.country + "_" + radio.name;
+			cursors[canonical] = this.state[canonical + "|cursor"];
+		}
+
+		const outData = {
+			playingRadio: this.state.playingRadio,
+			cursors: cursors
+		}
+
+		if (!this.state.isElectron) {
+			await fetch("flag", {
+				method: "POST",
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify(outData)
+			});
+		} else {
+			await navigator.abrflag(outData);
+		}
+		console.log("flag submitted");
+	}
+
 	render() {
 		let config = this.state.config;
 		let lang = this.state.locale;
@@ -632,6 +702,7 @@ class App extends Component {
 			mainContents = (
 				<Onboarding setLocale={this.setLocale}
 					locale={this.state.locale}
+					canvasWidth={this.state.canvasWidth}
 					finished={() => this.setState({ view: VIEWS.PLAYLIST })} />
 			);
 
@@ -709,6 +780,7 @@ class App extends Component {
 				<Controls playingRadio={this.state.playingRadio}
 					playingDelay={this.state.playingDelay}
 					play={this.play}
+					flag={this.flagContent}
 					locale={this.state.locale}
 					canStart={this.state.playingRadio || this.state.view === VIEWS.PLAYER} />
 			</AppParent>
@@ -740,9 +812,9 @@ const AppParent = styled.div`
 `;
 
 const AppView = styled.div`
-	height: calc(100% - 105px);
+	height: calc(100% - 127px);
 	max-width: 600px;
-	margin: 45px auto 0px auto;
+	margin: 67px auto 0px auto;
 	position: fixed;
 	overflow-y: auto;
 	overflow-x: hidden;
@@ -794,8 +866,7 @@ const MaxWidthContainer = styled.div`
 	display: flex;
 	justify-content: space-around;
 	height: 100%;
-	width: 100%;
-	padding: 0px 10px;
+	width: calc(100% - 20px);
 	background: white;
 `;
 

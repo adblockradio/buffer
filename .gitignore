@@ -6,3 +6,9 @@ node_modules/
 client/.htpasswd
 log/
 error.log
+Adblock Radio Buffer-linux-x64/
+.vscode/
+index-linux
+index-macos
+index-win.exe
+

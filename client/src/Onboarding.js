@@ -4,12 +4,13 @@ import styled from "styled-components";
 import FlagContainer from "./Flag.js";
 import { colorByType } from "./colors.js";
 import BlueButton from "./BlueButton.js";
+import DelaySVG from "./DelaySVG.js";
 
 import abrlogo from './img/round_logo.png';
-import leap from './img/leap_219178.svg';
+import leap from './img/leap_219178_ad.svg';
 import meter from './img/meter_1697884.svg';
-import target from './img/target_925909.svg';
-//import classnames from "classnames";
+import target from './img/a_plus.jpg';
+import flag from './img/flag2.svg';
 
 const LOCALE_FOR_COUNTRY = {
 	"United Kingdom": "en",
@@ -79,11 +80,17 @@ class Onboarding extends Component {
 					<ContentsContainer>
 						<img src={leap} width={128} alt='' />
 
-						<p>{{ en: "You are about to listen to your favorite radios with a delay of a few minutes.",
-							fr: "Vous allez écouter vos radios favorites avec un différé de quelques minutes." }[lang]}</p>
-						<p>{{ en: "That way, you will be able to fast-forward ads and chit-chat!",
-							fr: "Ainsi, vous pourrez sauter les pubs et le blabla !"}[lang]}
-							</p>
+						<p>{{ en: "You are about to listen to your favorite radios without ads and without ad breaks.",
+							fr: "Vous allez écouter vos radios favorites sans pubs et sans interruptions." }[lang]}</p>
+
+						<p>{{ en: "How is it possible? You will listen with a delay of a few minutes.",
+							fr: "Comment est-ce possible ? Vous allez écouter avec un délai de quelques minutes." }[lang]}</p>
+
+						<p>{{ en: "That way, you fast-forward ads and chit-chat and get continuous interesting content!",
+							fr: "Ainsi, vous passez les pubs et le blabla en avance rapide et obtenez le contenu intéressant en continu !"}[lang]}</p>
+
+						<p>{{ en: "If there have been too many ads so that they can no longer be skipped, the player switches to another station.",
+							fr: "S'il y a eu trop de publicités et que vous avez rattrapé le direct, le lecteur passe sur une autre station."}[lang]}</p>
 
 						<BlueButton onClick={() => this.setState({ step: this.state.step + 1})}>
 							{{ en: "Next", fr: "Suivant" }[lang]}
@@ -98,6 +105,40 @@ class Onboarding extends Component {
 
 						<p>{{ en: "The player gives an overview on what kind of content has just been broadcast.",
 							fr: "Le lecteur donne un aperçu de la nature du contenu qui passe à la radio."}[lang]}</p>
+						<p>{{ en: "On the left, the delayed playback. On the right, live audio. The pink cursor tells you what you listen to.",
+							fr: "À gauche, le différé. À droite, le direct. Le curseur rose, là où vous écoutez."}[lang]}</p>
+
+						<DelaySVG cursor={900*1000 - 300*1000}
+								availableCache={900}
+								classList={[
+									{
+										validFrom: 0,
+										validTo: 400*1000,
+										payload: "2-music"
+									},
+									{
+										validFrom: 400*1000,
+										validTo: 450*1000,
+										payload: "1-speech",
+									},
+									{
+										validFrom: 450*1000,
+										validTo: 650*1000,
+										payload: "0-ads"
+									},
+									{
+										validFrom: 650*1000,
+										validTo: 900*1000,
+										payload: "2-music"
+									}
+								]}
+								date={new Date(900*1000)}
+								playing={true}
+								cacheLen={900}
+								width={self.props.canvasWidth || 100}
+								locale={this.props.locale}
+								playCallback={function() {}}
+							/>
 						<p>{{ en: "Here is the color it uses.",
 							fr: "Voici les couleurs qu'il utilise."}[lang]}</p>
 						<ul>
@@ -127,6 +168,10 @@ class Onboarding extends Component {
 							fr: "Parfois Adblock Radio fait des erreurs…"}[lang]}</p>
 						<p>{{ en: "Not a problem! You can tell him and he will improve.",
 							fr: "Pas grave ! Vous pouvez lui dire et il s'améliorera."}[lang]}</p>
+						<p>{{ en: "When a radio is playing, here is the button to do a report:",
+							fr: "Voici le bouton de signalement qui apparaît pendant l'écoute :"}[lang]}</p>
+
+						<img src={flag} width={64} alt='' />
 
 						<BlueButton onClick={() => this.props.finished()}>
 							{{ en: "Choose my radios", fr: "Choisir mes radios" }[lang]}
@@ -162,6 +207,7 @@ Onboarding.propTypes = {
 	locale: PropTypes.string.isRequired,
 	setLocale: PropTypes.func.isRequired,
 	finished: PropTypes.func.isRequired,
+	canvasWidth: PropTypes.number,
 }
 
 const AbrLogo = styled.img`
@@ -174,14 +220,13 @@ const Container = styled.div`
 	width: 100%;
 	display: flex;
 	flex-direction: column;
-	padding-bottom: 15px;
 	background: white;
 	height: 100%;
 `;
 
 const ContentsContainer = styled.div`
 	text-align: center;
-	padding: 40px 15px 15px 15px;
+	padding: 15px 30px 15px 30px;
 	flex-grow: 1;
 	display: flex;
 	flex-direction: column;

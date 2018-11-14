@@ -3,45 +3,51 @@
 const { log } = require("abr-log")("config");
 const fs = require("fs");
 const { getRadioMetadata } = require("stream-tireless-baler");
-const jwt = require("jsonwebtoken");
 const axios = require("axios");
 
-
-// list of listened radios:
+// user configuration
 var config = new Object();
+// radios in playlist
 try {
-	try {
-		var radiosText = fs.readFileSync("config/radios.json");
-		config.radios = JSON.parse(radiosText);
-	} catch (e) {
-		config.radios = [];
-		log.warn("could not load radio playlist (this is fine on first startup)");
-	}
-	try {
-		var availableText = fs.readFileSync("config/available.json");
-		config.available = JSON.parse(availableText);
-	} catch (e) {
-		config.available = [];
-		log.warn("could not load list of available radios (this is fine on first startup)");
-	}
-	var userText = fs.readFileSync("config/user.json");
-	config.user = JSON.parse(userText);
-	if (config.user.token) {
-		var decoded = jwt.decode(config.user.token);
-		if (decoded && decoded.email) {
-			config.user.email = decoded.email;
-		} else {
-			config.user.email = "";
-		}
-	} else {
-		config.user.email = "";
-	}
-	//log.info("load config with radios " + config.radios.map(r => r.country + "_" + r.name).join(" "));
+	var radiosText = fs.readFileSync("config/radios.json");
+	config.radios = JSON.parse(radiosText);
 } catch (e) {
-	log.error("cannot load config. err=" + e);
-	process.exit(1);
+	config.radios = [];
+	log.info("default radio list loaded");
 }
 
+// radio catalog
+try {
+	var availableText = fs.readFileSync("config/available.json");
+	config.available = JSON.parse(availableText);
+} catch (e) {
+	config.available = [];
+	log.info("default available list loaded");
+}
+
+// user preferences
+try {
+	var userText = fs.readFileSync("config/user.json");
+	config.user = JSON.parse(userText);
+} catch (e) {
+	const uuidv4 = require('uuid/v4');
+	log.info("default config loaded");
+	config.user = {
+		"cacheLen": 900,
+		"streamInitialBuffer": 8,
+		"streamGranularity": 2,
+		"maxRadios": 3,
+		"discardSmallSegments": 20,
+		"serverPort": 9820,
+		"modelRepo": "https://www.adblockradio.com/models/",
+		"uuid": uuidv4()
+	}
+	try {
+		fs.writeFileSync("config/user.json", JSON.stringify(config.user, null, '\t'));
+	} catch (e) {
+		log.error("could not write config file. err=" + e);
+	}
+}
 exports.config = config;
 
 const { startMonitoring } = require("./cache");
@@ -246,7 +252,7 @@ const gatherStatus = function(since) {
 		}
 		//var hasAvailable =
 		if (config.radios[i].liveStatus && config.radios[i].liveStatus.audioCache) {
-			Object.assign(obj, { available: Math.floor(config.radios[i].liveStatus.audioCache.getAvailableCache()-config.user.streamInitialBuffer) });
+			Object.assign(obj, { available: Math.floor(config.radios[i].liveStatus.audioCache.getAvailableCache()) });
 		}
 		if (config.radios[i].liveStatus && config.radios[i].liveStatus.metaCache) {
 			Object.assign(obj, config.radios[i].liveStatus.metaCache.read(since));
@@ -257,3 +263,16 @@ const gatherStatus = function(since) {
 }
 
 exports.gatherStatus = gatherStatus;
+
+const exit = function() {
+	for (let i=0; i<config.radios.length; i++) {
+		if (config.radios[i].liveStatus) {
+			config.radios[i].liveStatus.predictor.stopDl();
+		}
+	}
+	setTimeout(function() {
+		process.exit(0);
+	}, 1000);
+}
+
+exports.exit = exit;

@@ -5,12 +5,26 @@ import classNames from 'classnames';
 
 import playing from "./img/playing.gif";
 import iconStop from "./img/stop_1279170.svg";
-
+import iconFlag from "./img/flag2.svg";
 
 class Controls extends Component {
-	/*constructor(props) {
+	constructor(props) {
 		super(props);
-	}*/
+		this.state = {
+			flagAllowed: true,
+		}
+		this.flag = this.flag.bind(this);
+	}
+
+	flag() {
+		if (!this.state.flagAllowed) return;
+		this.props.flag();
+		const self = this;
+		self.setState({ flagAllowed: false });
+		setTimeout(function() {
+			self.setState({ flagAllowed: true });
+		}, 5000);
+	}
 
 	render() {
 
@@ -57,7 +71,16 @@ class Controls extends Component {
 		var buttons = (
 			<StatusButtonsContainer>
 				{this.props.playingRadio &&
-					<PlaybackButton className={classNames({ inactive: !this.props.playingRadio })} src={iconStop} alt="Stop" onClick={() => this.props.play(null, null, null)} />
+					<PlaybackButton className={classNames({ inactive: !this.state.flagAllowed })}
+						src={iconFlag}
+						alt={{en: "Report a misprediction", fr: "Signaler une erreur de filtre"}[lang]}
+						onClick={() => this.flag()} />
+				}
+				{this.props.playingRadio &&
+						<PlaybackButton className={classNames({ inactive: !this.props.playingRadio })}
+						src={iconStop}
+						alt={{en: "Stop the player", fr: "Arrêter la lecture"}[lang]}
+						onClick={() => this.props.play(null, null, null)} />
 				}
 			</StatusButtonsContainer>
 		);
@@ -85,6 +108,7 @@ Controls.propTypes = {
 	playingRadio: PropTypes.string,
 	playingDelay: PropTypes.number,
 	play: PropTypes.func.isRequired,
+	flag: PropTypes.func.isRequired,
 }
 
 const PlayingGif = styled.img`

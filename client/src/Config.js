@@ -65,8 +65,8 @@ class Config extends Component {
 				})}
 				<ButtonContainer>
 					<ButtonTitle>
-						{{ en: "When you are done selecting the contents you want to hear, you can start listening!",
-							fr: "Quand les contenus sélectionnés vous conviennent, vous pouvez écouter la radio !" }[lang]}
+						{{ en: "When you are ready, you can start listening!",
+							fr: "Quand vous êtes prêt, vous pouvez écouter la radio !" }[lang]}
 					</ButtonTitle>
 					<BlueButton onClick={() => this.props.finish()}>
 						{{ en: "Listen to the radio", fr: "Écouter la radio" }[lang]}

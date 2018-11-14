@@ -3,7 +3,7 @@
 import React, { Component } from "react";
 import PropTypes from "prop-types";
 import styled from "styled-components";
-import classNames from 'classnames';
+//import classNames from 'classnames';
 import 'rc-checkbox/assets/index.css';
 import defaultCover from "./img/default_radio_logo.svg";
 import removeIcon from "./img/remove_991614.svg";
@@ -106,11 +106,11 @@ class Playlist extends Component {
 					// TODO it would be nice to make the default cover display if the original logo gives a 40x error.
 					// as is, it does not work
 					return (
-						<PlaylistItem className={classNames({ active: true })} key={"item" + i}>
+						<PlaylistItem key={"item" + i}>
 							<PlaylistItemTopRow>
 								<PlaylistItemLogo src={radio.favicon || defaultCover} alt="logo"
 									onError={(e)=>{e.target.src=defaultCover}} />
-								<PlaylistItemText onClick={() => self.remove(radio.country, radio.name)}>
+								<PlaylistItemText>
 									{radio.name}
 								</PlaylistItemText>
 								<RemoveIcon src={removeIcon} onClick={() => self.remove(radio.country, radio.name)} />
@@ -119,7 +119,7 @@ class Playlist extends Component {
 					)
 				})}
 				{!playlistFull ?
-					<div>
+					<AddRadiosContainer>
 						<PlaylistSectionTitle>{{ en: "Add radios to your playlist", fr: "Ajouter des radios à votre playlist" }[lang]}</PlaylistSectionTitle>
 						<ChoiceCountryContainer>
 							{/*<p>{{ en: "Choose the country of radios", fr: "Choisissez le pays des radios" }[lang]}</p>*/}
@@ -138,21 +138,18 @@ class Playlist extends Component {
 
 						{available.filter(r => r.country === countries[this.state.selectionCountry]).map(function(radio, i) {
 							return (
-								<PlaylistItem className={classNames({ active: !playlistFull })} key={"item" + i}
-									onClick={function() { if (!playlistFull) self.insert(radio.country, radio.name); }}>
+								<PlaylistItem key={"item" + i}>
 									<PlaylistItemTopRow>
 										<PlaylistItemLogo src={radio.favicon || defaultCover} alt={radio.name} />
 										<PlaylistItemText>
 											{radio.name}
 										</PlaylistItemText>
-										{!playlistFull &&
-											<AddIcon src={removeIcon} />
-										}
+										<AddIcon src={removeIcon} onClick={() => self.insert(radio.country, radio.name) }/>
 									</PlaylistItemTopRow>
 								</PlaylistItem>
 							)
 						})}
-					</div>
+					</AddRadiosContainer>
 				:
 					<FullNoticeContainer>
 						<PlaylistSectionTitle>
@@ -186,7 +183,7 @@ Playlist.propTypes = {
 
 const PlaylistContainer = styled.div`
 	flex-grow: 1;
-	padding-bottom: 60px;
+	padding-bottom: 10px;
 `;
 
 const PlaylistSectionTitle = styled.p`
@@ -204,12 +201,7 @@ const PlaylistItem = styled.div`
 	background: white;
 	display: flex;
 	flex-direction: column;
-	cursor: not-allowed;
 	box-shadow: 0px 2px 3px grey;
-
-	&.active {
-		cursor: pointer;
-	}
 `;
 
 const PlaylistItemTopRow = styled.div`
@@ -234,6 +226,7 @@ const RemoveIcon = styled.img`
 	width: 32px;
 	height: 32px;
 	align-self: center;
+	cursor: pointer;
 `;
 
 const AddIcon = styled.img`
@@ -241,6 +234,7 @@ const AddIcon = styled.img`
 	height: 32px;
 	align-self: center;
 	transform: rotate(45deg);
+	cursor: pointer;
 `;
 
 const SoloMessage = styled.div`
@@ -256,6 +250,10 @@ const ChoiceCountryContainer = styled.div`
 	display: flex;
 	flex-direction: row;
 	justify-content: center;
+`;
+
+const AddRadiosContainer = styled.div`
+	margin-top: 30px;
 `;
 
 const FullNoticeContainer = styled.div`

@@ -5,6 +5,7 @@ import PropTypes from "prop-types";
 //import styled from "styled-components";
 //import classNames from 'classnames';
 import { colors } from "./colors.js";
+import loading from "./img/loading.svg";
 
 const TICKS_INTERVAL = 60000;
 
@@ -27,18 +28,25 @@ class DelaySVG extends Component {
 		var x = event.clientX - rect.left;
 
 		//var width = this.refs.canvas.getContext("2d").canvas.width;
-		var newDelay = Math.round((this.props.cacheLen*(1-x/this.props.width)-(this.props.cacheLen-this.props.availableCache+this.props.streamInitialBuffer))*1000);
+		var newDelay = Math.round((this.props.cacheLen*(1-x/this.props.width)-(this.props.cacheLen-this.props.availableCache))*1000);
 		//console.log("Canvas click: x=" + x + " width=" + width + " cacheLen=" + this.props.cacheLen + " newDelay=" + newDelay);
 		this.play(newDelay);
 	}
 
 	delayToX(width, delay) {
-		return Math.round(width*(1-(this.props.cacheLen-this.props.availableCache+this.props.streamInitialBuffer+delay/1000)/this.props.cacheLen));
+		return Math.round(width*(1-(this.props.cacheLen-this.props.availableCache+delay/1000)/this.props.cacheLen));
 	}
 
 	render() {
 		var self = this;
 		const height = 24; // pixels
+		const lang = this.props.locale;
+
+		if (!this.props.availableCache) {
+			return (
+				<img src={loading} height={height} alt={{ en: "Loading...", fr: "Chargement..."}[lang]} />
+			)
+		}
 
 		const cursorX = this.delayToX(this.props.width, this.props.cursor);
 
@@ -78,7 +86,7 @@ class DelaySVG extends Component {
 			Math.round(cursorX-0.3*height) + ",0";
 
 		return (
-			<svg width={this.props.width-24} height={height + "px"} onClick={self.getCursorPosition} ref="canvas" style={{marginTop: "10px"}}>
+			<svg width={this.props.width} height={height + "px"} onClick={self.getCursorPosition} ref="canvas" style={{marginTop: "10px"}}>
 
 				{/*!isNaN(cursorX) &&
 					<rect x={0} y={0} width={cursorX} height={this.props.classList ? 0.4*height : height} style={{fill: this.props.playing ? colors.LIGHT_PINK : colors.LIGHT_GREY}} />
@@ -108,7 +116,8 @@ DelaySVG.propTypes = {
 	date: PropTypes.object.isRequired,
 	cacheLen: PropTypes.number.isRequired,
 	playCallback: PropTypes.func.isRequired,
-	classList: PropTypes.array.isRequired,
+	classList: PropTypes.array,
+	locale: PropTypes.string.isRequired,
 };
 
 /*var canvasContainerStyle = {

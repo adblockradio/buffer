@@ -47,17 +47,15 @@ class Playlist extends Component {
 								</MetadataItem>
 							</RadioItemTopLine>
 
-							{self.props.radioState[radio].metadata &&
-								<DelaySVG cursor={+self.props.date - self.props.radioState[radio].cursor}
-									availableCache={self.props.radioState[radio].availableCache}
-									classList={self.props.radioState[radio].classList}
-									date={new Date(+self.props.date - self.props.clockDiff)}
-									playing={playing}
-									cacheLen={self.props.config.user.cacheLen}
-									streamInitialBuffer={self.props.config.user.streamInitialBuffer}
-									width={self.props.canvasWidth || 100}
-									playCallback={function(delay) { self.props.play(radio, delay, null); }} />
-							}
+							<DelaySVG cursor={+self.props.date - self.props.radioState[radio].cursor}
+								availableCache={self.props.radioState[radio].availableCache}
+								classList={self.props.radioState[radio].classList}
+								date={new Date(+self.props.date - self.props.clockDiff)}
+								playing={playing}
+								cacheLen={self.props.config.user.cacheLen}
+								width={self.props.canvasWidth || 100}
+								locale={self.props.locale}
+								playCallback={function(delay) { self.props.play(radio, delay, null); }} />
 
 						</RadioItem>
 					)
@@ -112,7 +110,7 @@ const RadioItem = styled.div`
 	border-radius: 10px;
 	margin: 10px 10px 0px 10px;
 	padding: 10px 10px 6px 10px;
-	width: calc(100% - 20px);
+	width: calc(100% - 44px);
 	cursor: pointer;
 	background: white;
 	box-shadow: 0px 2px 3px grey;
@@ -164,6 +162,7 @@ const CacheWarning = styled.div`
 	margin: 20px auto 0px auto;
 	padding: 10px 10px 0px 10px;
 	border-radius: 5px;
+	background: white;
 `;
 
 export default Playlist;

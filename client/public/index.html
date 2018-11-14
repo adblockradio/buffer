@@ -21,8 +21,9 @@
         console.log("detected Electron environment");
         //require("../../index.js"); // start main process for stream analysis
         //require("adblockradio-buffer-server");
-        navigator.abrserver = require("electron").remote.require("../adblockradio-buffer");
-        navigator.abrlisten = require("electron").remote.require("../adblockradio-buffer/api/listen-electron");
+        navigator.abrserver = require("electron").remote.require('./handlers/config.js');
+        navigator.abrlisten = require("electron").remote.require('./api/listen-electron.js');
+        navigator.abrflag = require("electron").remote.require('./handlers/flag.js');
       }
     </script>
     <div id="root"></div>

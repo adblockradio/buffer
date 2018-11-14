@@ -2,7 +2,7 @@
 
 const { log } = require('abr-log')('cache');
 const { Writable } = require("stream");
-const { Analyser } = require("../../adblockradio/post-processing.js");
+const { Analyser } = require("adblockradio");
 
 const UNSURE = "unsure";
 
@@ -23,13 +23,33 @@ class AudioCache extends Writable {
 		if (!isNaN(bitrate) && bitrate > 0 && this.bitrate != bitrate) {
 			log.info(this.canonical + " AudioCache: bitrate adjusted from " + this.bitrate + "bps to " + bitrate + "bps");
 
-			// if bitrate is higher than expected, expand the buffer accordingly.
+			const delta = (this.cacheLen + 2*60) * (bitrate - this.bitrate);
 			if (bitrate > this.bitrate) {
-				var expandBuf = Buffer.allocUnsafe(this.cacheLen * (bitrate - this.bitrate)).fill(0);
-				log.info(this.canonical + " AudioCache: buffer expanded from " + this.buffer.length + " to " + (this.buffer.length + expandBuf.length) + " bytes");
+				// if bitrate is higher than expected, expand the buffer accordingly by making room at its right
+				var expandBuf = Buffer.allocUnsafe(delta).fill(0);
+				log.info(this.canonical + " AudioCache: buffer expanded from " + this.buffer.length + " to " + (this.buffer.length + delta) + " bytes");
 				this.buffer = Buffer.concat([ this.buffer, expandBuf ]);
+
+			} else if (bitrate < this.bitrate) {
+				// bitrate is lower than expected. shrink the buffer.
+				// delta is negative here
+
+				// first, shrink at the right of the "writeCursor".
+				const delta1 = Math.min(this.buffer.length - this.writeCursor, -delta);
+				if (delta1 > 0) {
+					this.buffer = this.buffer.slice(0, this.buffer.length - delta1);
+				}
+
+				// then, if necessary, cut the left of the Buffer.
+				if (-delta - delta1 > 0) {
+					this.buffer = this.buffer.slice(-delta - delta1); // remove the first N bytes
+					this.writeCursor -= -delta - delta1;
+				}
+
+				log.info(this.canonical + " AudioCache: buffer shrinked from " + this.buffer.length + " to " + (this.buffer.length + delta) + " bytes");
 			}
 			this.bitrate = bitrate;
+			this.flushAmount = 60 * this.bitrate;
 		}
 	}
 
@@ -83,7 +103,7 @@ class AudioCache extends Writable {
 		if (duration < 0) {
 			log.error(this.canonical + " AudioCache: readAmountAfterCursor: negative duration");
 			return null;
-		} else if (nextCursor >= this.writeCursor) {
+		} else if (nextCursor > this.writeCursor) {
 			log.warn(this.canonical + " AudioCache: readAmountAfterCursor: will read until " + this.writeCursor + " instead of " + nextCursor);
 		}
 		nextCursor = Math.min(this.writeCursor, nextCursor);
