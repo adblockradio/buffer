@@ -24,7 +24,7 @@ cd ..
 npx electron-packager . --overwrite \
 	--platform=linux \
 	--arch=x64 \
-	--icon=client/src/img/ab_radio_512.png \
+	--icon=resources/app/client/src/img/ab_radio_512.png \
 	--ignore=model/ \
 	--ignore=doc/ \
 	--ignore=config/available.json \
@@ -48,6 +48,8 @@ npx electron-packager . --overwrite \
 	--ignore=node_modules/adblockradio/model/ \
 	--ignore=node_modules/adblockradio/records/ \
 	--ignore=node_modules/adblockradio/podcasts/ \
-	--ignore=node_modules/adblockradio-buffer-linux-x64/
+	--ignore=node_modules/adblockradio-buffer-linux-x64/ \
+	--ignore=.vscode/ \
+	--ignore=error\.log
 
-# missing ignore for log/ and config/
+# TODO missing ignore for log/ (as is, it also ignores abr-log and it's a no-go)
