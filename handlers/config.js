@@ -35,7 +35,7 @@ try {
 	log.info("default config loaded");
 	config.user = {
 		"cacheLen": 900,
-		"streamInitialBuffer": 8,
+		"streamInitialBuffer": 10,
 		"streamGranularity": 2,
 		"maxRadios": 4,
 		"discardSmallSegments": 20,
