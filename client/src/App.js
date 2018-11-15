@@ -285,7 +285,7 @@ class App extends Component {
 						onCursorChecked();
 					} else if (self.state.playingRadio === radioName && res.hasAcceptableContent && res.delayChanged) {
 						// here, we know we are playing a channel with good content at the updated delay
-						self.play(radioName, null, function(err) {
+						self.play(radioName, +self.state.date - self.state[radioName + "|cursor"], function(err) {
 							onCursorChecked();
 						});
 					} else {
@@ -774,13 +774,15 @@ class App extends Component {
 					</MaxWidthContainer>
 				</Tabs>
 				<TabSpacer />
-				<AppView>
+				<AppView className={classNames({ white: this.state.view === VIEWS.ONBOARDING })}>
 					{mainContents}
 				</AppView>
 				<Controls playingRadio={this.state.playingRadio}
 					playingDelay={this.state.playingDelay}
 					play={this.play}
 					flag={this.flagContent}
+					clickableMeta={this.state.config.radios.length > 0}
+					clickMeta={() => this.setState({ view: VIEWS.PLAYER })}
 					locale={this.state.locale}
 					canStart={this.state.playingRadio || this.state.view === VIEWS.PLAYER} />
 			</AppParent>
@@ -819,7 +821,10 @@ const AppView = styled.div`
 	overflow-y: auto;
 	overflow-x: hidden;
 	width: 100%;
-	/*background: white;*/
+
+	&.white {
+		background: white;
+	}
 `;
 
 const TabSpacer = styled.div`

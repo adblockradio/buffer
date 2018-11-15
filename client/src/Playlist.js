@@ -118,9 +118,23 @@ class Playlist extends Component {
 						</PlaylistItem>
 					)
 				})}
+				{current.length > 1 &&
+					<FullNoticeContainer>
+						<PlaylistSectionTitle>
+							{{en: "When your playlist is ready, customize your filters.",
+								fr: "Quand votre playlist est prête, personnalisez vos filtres."}[lang]}
+						</PlaylistSectionTitle>
+						<BlueButton onClick={() => this.props.finish()}>
+							{{ en: "Select filters", fr: "Choisir les filtres" }[lang]}
+						</BlueButton>
+					</FullNoticeContainer>
+				}
 				{!playlistFull ?
 					<AddRadiosContainer>
-						<PlaylistSectionTitle>{{ en: "Add radios to your playlist", fr: "Ajouter des radios à votre playlist" }[lang]}</PlaylistSectionTitle>
+						<PlaylistSectionTitle>
+							{{ en: "Add up to MAX radios to your playlist",
+								fr: "Ajoutez jusqu'à MAX radios à votre playlist" }[lang].replace("MAX", this.props.config.user.maxRadios)}
+							</PlaylistSectionTitle>
 						<ChoiceCountryContainer>
 							{/*<p>{{ en: "Choose the country of radios", fr: "Choisissez le pays des radios" }[lang]}</p>*/}
 							{countries.map(function(lang, index) {
@@ -152,13 +166,6 @@ class Playlist extends Component {
 					</AddRadiosContainer>
 				:
 					<FullNoticeContainer>
-						<PlaylistSectionTitle>
-							{{ en: "Your playlist is ready. You can now customize your filters.",
-								fr: "Votre playlist est prête. Vous pouvez maintenant personnaliser vos filtres." }[lang]}
-						</PlaylistSectionTitle>
-						<BlueButton onClick={() => this.props.finish()}>
-							{{ en: "Select filters", fr: "Choisir les filtres" }[lang]}
-						</BlueButton>
 						<PlaylistSectionTitle>
 							{{ en: "If you want to change the playlist, first make room in it.",
 								fr: "Si vous souhaitez modifier votre playlist, faites-y d'abord de la place." }[lang]}

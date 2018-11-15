@@ -18,5 +18,3 @@ module.exports = (app) => app.post('/flag', async function(request, response) {
 		response.status(400).send("error");
 	}
 });
-
-log.info("XXXXX flag API ready!");

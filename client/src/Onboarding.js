@@ -135,7 +135,7 @@ class Onboarding extends Component {
 								date={new Date(900*1000)}
 								playing={true}
 								cacheLen={900}
-								width={self.props.canvasWidth || 100}
+								width={self.props.canvasWidth || 500}
 								locale={this.props.locale}
 								playCallback={function() {}}
 							/>

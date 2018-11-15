@@ -62,7 +62,9 @@ class Controls extends Component {
 		}
 
 		var status = (
-			<StatusTextContainer>
+			<StatusTextContainer
+				className={classNames({ active: this.props.clickableMeta })}
+				onClick={() => this.props.clickableMeta && this.props.clickMeta()}>
 				{/*<StatusClock>{moment(self.state.date).format("HH:mm")}</StatusClock>&nbsp;–&nbsp;*/}
 				{statusText}
 			</StatusTextContainer>
@@ -77,7 +79,7 @@ class Controls extends Component {
 						onClick={() => this.flag()} />
 				}
 				{this.props.playingRadio &&
-						<PlaybackButton className={classNames({ inactive: !this.props.playingRadio })}
+					<PlaybackButton className={classNames({ inactive: !this.props.playingRadio })}
 						src={iconStop}
 						alt={{en: "Stop the player", fr: "Arrêter la lecture"}[lang]}
 						onClick={() => this.props.play(null, null, null)} />
@@ -89,7 +91,8 @@ class Controls extends Component {
 			<Container>
 				<MaxWidthContainer>
 					{this.props.playingRadio &&
-						<PlayingGif src={playing} />
+						<PlayingGif className={classNames({ active: this.props.clickableMeta })} src={playing}
+							onClick={() => this.props.clickableMeta && this.props.clickMeta()} />
 					}
 					{status}
 					{buttons}
@@ -109,6 +112,8 @@ Controls.propTypes = {
 	playingDelay: PropTypes.number,
 	play: PropTypes.func.isRequired,
 	flag: PropTypes.func.isRequired,
+	clickableMeta: PropTypes.bool.isRequired,
+	clickMeta: PropTypes.func.isRequired,
 }
 
 const PlayingGif = styled.img`
@@ -116,6 +121,10 @@ const PlayingGif = styled.img`
 	height: 40px;
 	width: 40px;
 	margin: 0 -10px 0 10px;
+
+	&.active {
+		cursor: pointer;
+	}
 `;
 
 const Container = styled.div`
@@ -156,6 +165,10 @@ const StatusTextContainer = styled.span`
 	padding: 0px 10px 0 20px;
 	flex-shrink: 1;
 	flex-grow: 1;
+
+	&.active {
+		cursor: pointer;
+	}
 `;
 
 const DelayText = styled.span`

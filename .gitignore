@@ -1,6 +1,7 @@
 config/available.json
 config/radios.json
 config/user.json
+model/
 records/
 node_modules/
 client/.htpasswd

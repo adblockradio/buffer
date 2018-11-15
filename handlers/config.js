@@ -29,6 +29,7 @@ try {
 try {
 	var userText = fs.readFileSync("config/user.json");
 	config.user = JSON.parse(userText);
+	if (!config.user.uuid) config.user.uuid = uuidv4()
 } catch (e) {
 	const uuidv4 = require('uuid/v4');
 	log.info("default config loaded");
@@ -36,18 +37,19 @@ try {
 		"cacheLen": 900,
 		"streamInitialBuffer": 8,
 		"streamGranularity": 2,
-		"maxRadios": 3,
+		"maxRadios": 4,
 		"discardSmallSegments": 20,
 		"serverPort": 9820,
 		"modelRepo": "https://www.adblockradio.com/models/",
 		"uuid": uuidv4()
 	}
-	try {
-		fs.writeFileSync("config/user.json", JSON.stringify(config.user, null, '\t'));
-	} catch (e) {
-		log.error("could not write config file. err=" + e);
-	}
 }
+try {
+	fs.writeFileSync("config/user.json", JSON.stringify(config.user, null, '\t'));
+} catch (e) {
+	log.error("could not write config file. err=" + e);
+}
+
 exports.config = config;
 
 const { startMonitoring } = require("./cache");

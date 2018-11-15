@@ -86,7 +86,7 @@ class DelaySVG extends Component {
 			Math.round(cursorX-0.3*height) + ",0";
 
 		return (
-			<svg width={this.props.width} height={height + "px"} onClick={self.getCursorPosition} ref="canvas" style={{marginTop: "10px"}}>
+			<svg width={this.props.width} height={height + "px"} onClick={self.getCursorPosition} ref="canvas" style={{ marginTop: "10px", flexShrink: 0 }}>
 
 				{/*!isNaN(cursorX) &&
 					<rect x={0} y={0} width={cursorX} height={this.props.classList ? 0.4*height : height} style={{fill: this.props.playing ? colors.LIGHT_PINK : colors.LIGHT_GREY}} />
@@ -124,6 +124,5 @@ DelaySVG.propTypes = {
 	width: "100%",
 	height: "10px"
 }*/
-
 
 export default DelaySVG;
