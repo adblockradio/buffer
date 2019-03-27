@@ -3,16 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "async": "^2.6.1",
+    "async": "^2.6.2",
     "classnames": "^2.2.6",
-    "moment": "^2.22.2",
-    "rc-checkbox": "^2.1.5",
-    "react": "^16.6.0",
-    "react-dom": "^16.6.0",
+    "moment": "^2.24.0",
+    "rc-checkbox": "^2.1.6",
+    "react": "^16.8.5",
+    "react-dom": "^16.8.5",
     "styled-components": "^2.4.1"
   },
   "devDependencies": {
-    "react-scripts": "2.1.1"
+    "react-scripts": "^2.1.8"
   },
   "scripts": {
     "start": "react-scripts start",
