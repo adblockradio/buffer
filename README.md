@@ -1,13 +1,16 @@
 # Adblock Radio Buffer
 Listen to the radio ad-free and without interruptions.
 Adblock Radio Buffer buffers radio content and lets you fast-forward ads.
+
 Uses [Adblock Radio](https://github.com/adblockradio/adblockradio) as a backend, featuring machine-learning and acoustic fingerprinting techniques.
 
-# Preview
+[A technical discussion describes how it works](https://www.adblockradio.com/blog/2018/11/15/designing-audio-ad-block-radio-podcast/).
+
+## Preview
 
 ![](doc/abr-buffer.png)
 
-## Player interface
+### Player interface
 
 For each radio, metadata is retrieved with the [open source live metadata scraper](https://github.com/adblockradio/webradio-metadata).
 
@@ -17,29 +20,28 @@ Each color tells the user about the content of the audio:
 - green for talk
 - red for ads
 
-## Select the content you want to hear
+### Select the content you want to hear
 
 You can choose what kind of content you want to hear or skip on each radio.
 
 On news stations, it is great just to skip ads.
 On musical stations, it's convenient to skip ads and also talk interruptions.
 
-## Many radios available, more to come
+### Many radios available, more to come
 
 At the time of writing, 84 radios are available in the player.
 
 It is planned to add more. You can [submit requests here](https://github.com/adblockradio/available-models/).
 
-## Crowd-sourced improvements of the filters
+### Crowd-sourced improvements of the filters
 
 Sometimes the predictor is wrong. Not a problem, it is possible to report mispredictions.
 
 It makes Adblock Radio better for everybody.
 
-# Installation
+## Installation
 
-## Docker
-
+### Docker
 Built images are available on Docker Hub as `adblockradio/buffer`. Check on https://hub.docker.com/r/adblockradio/buffer.
 
 Find the version you want to run, e.g. `0.1.0`.
@@ -52,14 +54,14 @@ The interface is then available at http://localhost:9820/.
 
 To build your own Docker image, head to `docker-build.sh`.
 
-## Desktop binary (Linux only, alpha quality)
+### Desktop binary (Linux only, alpha quality)
 An Electron Linux binary is available [here](http://cdn.s00.adblockradio.com/ABR-Buffer-v1.0.tar.gz).
 It has been tested on Debian 8.0/LMDE2 x64.
 It needs `ffmpeg` on your system. If you do not have it, run `sudo apt install ffmpeg`.
 
 Windows and Mac builds are expected in the future.
 
-## From source
+### From source
 Installation instructions expect a minimum of technical knowledge.
 
 Create an empty directory somewhere on your machine, we call it `DIR`.
@@ -77,14 +79,14 @@ npm run build
 cd ..
 ```
 
-### Interface in browser
+#### Interface in browser
 ```
 npm run start
 ```
 Open `http://localhost:9820` in your favorite browser.
 Add your radios and enjoy!
 
-### Interface in Electron (native desktop app)
+#### Interface in Electron (native desktop app)
 ```
 cd node_modules/adblockradio
 npm rebuild zeromq --runtime=electron --target=3.1.7 --update-binary
@@ -94,7 +96,7 @@ npm run electron
 Add your radios and enjoy!
 
 
-## Development
+### Development
 
 In a first terminal, open React dev server:
 ```
@@ -102,20 +104,20 @@ cd client
 npm start
 ```
 
-### Interface in browser
+#### Interface in browser
 In another terminal, run the backend:
 ```
 npm run startdev
 ```
 Open `http://localhost:9820` in your favorite browser.
 
-### Interface in Electron (native desktop app)
+#### Interface in Electron (native desktop app)
 In another terminal, run the backend:
 ```
 npm run electrondev
 ```
 
-# Roadmap
+## Roadmap
 
 - Nicer UI and UX (help would be appreciated)
 - Cross platform Electron builds
@@ -124,6 +126,6 @@ npm run electrondev
 
 Contributions welcome.
 
-# Copyright
+## Copyright
 
 Copyright 2018-2019, [Alexandre Storelli](https://github.com/dest4)
