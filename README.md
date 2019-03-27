@@ -52,10 +52,10 @@ Create an empty directory somewhere on your machine, we call it `DIR`.
 
 First, install [Adblock Radio algorithm](https://github.com/adblockradio/adblockradio). You should now have `DIR/adblockradio` with the files inside. In that subdirectory, run `node demo.js` to check everything is working correctly.
 
-Then, install this player. This has been tested with `node` version 10.9.0 and `npm` version 6.4.1. Run these commands in `DIR`, so that `DIR/adblockradio-buffer` will be created:
+Then, install this player. Run these commands in `DIR`, so that `DIR/buffer` will be created:
 ```
-git clone https://github.com/adblockradio/adblockradio-buffer.git
-cd adblockradio-buffer
+git clone https://github.com/adblockradio/buffer.git
+cd buffer
 npm install
 cd client
 npm install
@@ -112,4 +112,4 @@ Contributions welcome.
 
 # Copyright
 
-Copyright 2018, [Alexandre Storelli](https://github.com/dest4)
+Copyright 2018-2019, [Alexandre Storelli](https://github.com/dest4)
