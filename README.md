@@ -26,7 +26,7 @@ On musical stations, it's convenient to skip ads and also talk interruptions.
 
 ## Many radios available, more to come
 
-At the time of writing, 68 radios are available in the player.
+At the time of writing, 84 radios are available in the player.
 
 It is planned to add more. You can [submit requests here](https://github.com/adblockradio/available-models/).
 
@@ -38,7 +38,21 @@ It makes Adblock Radio better for everybody.
 
 # Installation
 
-## Binary (Linux only, alpha quality)
+## Docker
+
+Built images are available on Docker Hub as `adblockradio/buffer`. Check on https://hub.docker.com/r/adblockradio/buffer.
+
+Find the version you want to run, e.g. `0.1.0`.
+
+```
+./docker-run.sh VERSION
+```
+
+The interface is then available at http://localhost:9820/.
+
+To build your own Docker image, head to `docker-build.sh`.
+
+## Desktop binary (Linux only, alpha quality)
 An Electron Linux binary is available [here](http://cdn.s00.adblockradio.com/ABR-Buffer-v1.0.tar.gz).
 It has been tested on Debian 8.0/LMDE2 x64.
 It needs `ffmpeg` on your system. If you do not have it, run `sudo apt install ffmpeg`.
