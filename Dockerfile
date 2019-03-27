@@ -1,27 +1,26 @@
-FROM node:carbon
+FROM adblockradio/adblockradio-docker-primary:0.0.2
 
 RUN useradd --user-group --create-home --shell /bin/false app && \
-	mkdir -p /usr/src/adblockradio-buffer \
-		/usr/src/adblockradio-buffer/config \
-		/usr/src/adblockradio-buffer/log \
-		/usr/src/adblockradio-buffer/adblockradio-dl \
-		/usr/src/adblockradio-buffer/client/build && \
-	chown -R app:app /usr/src/adblockradio-buffer
+	mkdir -p /usr/src/buffer/api \
+		/usr/src/buffer/client/build \
+		/usr/src/buffer/config \
+		/usr/src/buffer/handlers \
+		/usr/src/buffer/log \
+		/usr/src/buffer/model && \
+	chown -R app:app /usr/src/buffer
 
-WORKDIR /usr/src/adblockradio-buffer
+WORKDIR /usr/src/buffer
+
 USER app
 
-# installation of main module files
-COPY *.js* ./
-COPY config/default* config/
-COPY adblockradio-dl adblockradio-dl/
+COPY index.js ./
+COPY package* ./
+COPY api/*.js api/
+COPY client/build/ client/build/
+COPY handlers/*.js handlers/
 
-WORKDIR /usr/src/adblockradio-buffer
-COPY client/build client/build/
-RUN mv config/default_user.json config/user.json && \
-	mv config/default_radios.json config/radios.json && \
-	npm install
+RUN npm install --only=prod
 
 EXPOSE 9820
-ENV NAME World
+
 CMD ["node", "index.js"]
