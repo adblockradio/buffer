@@ -73,7 +73,7 @@ Add your radios and enjoy!
 ### Interface in Electron (native desktop app)
 ```
 cd node_modules/adblockradio
-npm rebuild zeromq --runtime=electron --target=3.0.9 --update-binary
+npm rebuild zeromq --runtime=electron --target=3.1.7 --update-binary
 cd ../..
 npm run electron
 ```
