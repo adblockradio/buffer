@@ -3,22 +3,38 @@ import PropTypes from "prop-types";
 import styled from "styled-components";
 import classNames from "classnames";
 
-import France from "./img/flags/France.svg";
-import UK from "./img/flags/United Kingdom.svg";
+import Argentina from "./img/flags/Argentina.svg";
 import Belgium from "./img/flags/Belgium.svg";
+import Canada from "./img/flags/Canada.svg";
+import Finland from "./img/flags/Finland.svg";
+import France from "./img/flags/France.svg";
 import Germany from "./img/flags/Germany.svg";
+import Italy from "./img/flags/Italy.svg";
+import Netherlands from "./img/flags/Netherlands.svg";
+import NewZealand from "./img/flags/New Zealand.svg";
+import Slovakia from "./img/flags/Slovakia.svg";
 import Spain from "./img/flags/Spain.svg";
 import Switzerland from "./img/flags/Switzerland.svg";
-import Italy from "./img/flags/Italy.svg";
+import UK from "./img/flags/United Kingdom.svg";
+import USA from "./img/flags/United States of America.svg";
+import Uruguay from "./img/flags/Uruguay.svg";
 
 const flags = {
-	"France": France,
-	"United Kingdom": UK,
+	"Argentina": Argentina,
 	"Belgium": Belgium,
-	"Spain": Spain,
-	"Switzerland": Switzerland,
+	"Canada": Canada,
+	"Finland": Finland,
+	"France": France,
 	"Italy": Italy,
 	"Germany": Germany,
+	"Netherlands": Netherlands,
+	"New Zealand": NewZealand,
+	"Slovakia": Slovakia,
+	"Spain": Spain,
+	"Switzerland": Switzerland,
+	"United Kingdom": UK,
+	"United States of America": USA,
+	"Uruguay": Uruguay,
 }
 
 const FlagBox = styled.div`
@@ -43,6 +59,11 @@ const Flag = styled.img`
 `;
 
 class FlagContainer extends Component {
+	constructor() {
+		super();
+		this.countries = Object.keys(flags);
+	}
+
 	render() {
 		return (
 			<FlagBox className={classNames({ selected: this.props.selected, clickable: this.props.onClick })} onClick={this.props.onClick}>

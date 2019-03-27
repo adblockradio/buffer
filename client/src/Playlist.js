@@ -10,15 +10,8 @@ import removeIcon from "./img/remove_991614.svg";
 import FlagContainer from "./Flag.js";
 import BlueButton from "./BlueButton.js";
 
-const countries = [
-	"France",
-	"United Kingdom",
-	"Belgium",
-	"Spain",
-	"Switzerland",
-	"Italy",
-	"Germany",
-]
+
+const { countries } = (new FlagContainer());
 
 class Playlist extends Component {
 	constructor(props) {
@@ -31,7 +24,7 @@ class Playlist extends Component {
 			radiosError: false,
 			radios: [],
 			isElectron: navigator.userAgent.toLowerCase().indexOf(' electron/') > -1,
-			selectionCountry: 0,
+			selectionCountry: null,
 		}
 	}
 
@@ -150,19 +143,28 @@ class Playlist extends Component {
 							})}
 						</ChoiceCountryContainer>
 
-						{available.filter(r => r.country === countries[this.state.selectionCountry]).map(function(radio, i) {
-							return (
-								<PlaylistItem key={"item" + i}>
-									<PlaylistItemTopRow>
-										<PlaylistItemLogo src={radio.favicon || defaultCover} alt={radio.name} />
-										<PlaylistItemText>
-											{radio.name}
-										</PlaylistItemText>
-										<AddIcon src={removeIcon} onClick={() => self.insert(radio.country, radio.name) }/>
-									</PlaylistItemTopRow>
-								</PlaylistItem>
-							)
-						})}
+						{available
+							.filter(function(r) {
+								if (self.state.selectionCountry === null) return true;
+								return r.country === countries[self.state.selectionCountry];
+							})
+							.sort(function(r1, r2) {
+								return r1.name > r2.name;
+							})
+							.map(function(radio, i) {
+								return (
+									<PlaylistItem key={"item" + i}>
+										<PlaylistItemTopRow>
+											<PlaylistItemLogo src={radio.favicon || defaultCover} alt={radio.name} />
+											<PlaylistItemText>
+												{radio.name}
+											</PlaylistItemText>
+											<AddIcon src={removeIcon} onClick={() => self.insert(radio.country, radio.name) }/>
+										</PlaylistItemTopRow>
+									</PlaylistItem>
+								)
+							})
+						}
 					</AddRadiosContainer>
 				:
 					<FullNoticeContainer>
@@ -257,6 +259,7 @@ const ChoiceCountryContainer = styled.div`
 	display: flex;
 	flex-direction: row;
 	justify-content: center;
+	flex-wrap: wrap;
 `;
 
 const AddRadiosContainer = styled.div`
