@@ -41,18 +41,45 @@ It makes Adblock Radio better for everybody.
 
 ## Installation
 
-### Docker
+### Docker (recommended for most users)
+
+Choose a directory where configuration and log files will be stored.
+```
+mkdir /var/lib/adblockradio
+mkdir /var/lib/adblockradio/config
+mkdir /var/lib/adblockradio/log
+```
+
 Built images are available on Docker Hub as `adblockradio/buffer`. Check on https://hub.docker.com/r/adblockradio/buffer.
 
 Find the version you want to run, e.g. `0.1.0`.
 
 ```
-./docker-run.sh VERSION
+VERSION=0.1.0
+docker pull adblockradio/buffer:$VERSION
+cd /var/lib/adblockradio
+docker run -it -p 9820:9820 -a STDOUT --mount type=bind,source="$(pwd)"/config,target=/usr/src/adblockradio-buffer/config --mount type=bind,source="$(pwd)"/log,target=/usr/src/adblockradio-buffer/log adblockradio/buffer:$VERSION
 ```
+The interface should now be available at http://localhost:9820/. Type Ctrl-P Ctrl-Q to detach from the container.
 
-The interface is then available at http://localhost:9820/.
+To make it accessible to remote clients, configure e.g. Nginx the following way:
+```
+server {
+        server_name subdomain.your-server.com;
+        root /usr/share/nginx/html;
 
-To build your own Docker image, head to `docker-build.sh`.
+        location / {
+                proxy_set_header   X-Real-IP $remote_addr;
+                proxy_set_header   Host      $http_host;
+                proxy_pass         http://127.0.0.1:9820;
+                proxy_set_header   X-Forwarded-Proto https;
+        }
+        listen 80;
+}
+```
+and use [Certbot](https://certbot.eff.org/) to enable HTTPS. You are good to go.
+
+Advanced users and developers can build their own Docker image with `docker-build.sh`.
 
 ### Desktop binary (Linux only, alpha quality)
 An Electron Linux binary is available [here](http://cdn.s00.adblockradio.com/ABR-Buffer-v1.0.tar.gz).
